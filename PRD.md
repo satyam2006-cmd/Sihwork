@@ -89,7 +89,7 @@ An agentic virtual doctor that:
 │  ┌──────────────────────────────────────────────────────────┐    │
 │  │                  Session Manager                         │    │
 │  │  - WebSocket handler                                     │    │
-│  │  - Conversation state (messages[], EHR context, mem0)    │    │
+│  │  - Conversation state (messages[], EHR context, history) │    │
 │  │  - Language state (auto-detected per utterance)          │    │
 │  └──────────┬──────────────┬──────────────┬─────────────────┘    │
 │             │              │              │                       │
@@ -124,8 +124,8 @@ An agentic virtual doctor that:
 3. Backend kicks off Pre-Call Setup:
    a. Query Supabase for patient EHR data
    b. Process any unprocessed uploaded documents via Claude
-   c. Fetch mem0 long-term memory
-   d. Assemble initial context (system prompt + EHR + memory)
+   c. Query prior session summaries for cross-session context
+   d. Assemble initial context (system prompt + EHR + prior summaries)
    e. Signal frontend: "Ready"
 4. Frontend begins streaming audio via WebSocket
 5. For each audio chunk:
@@ -153,7 +153,7 @@ The virtual doctor operates in three phases: **Pre-Call Setup**, **Active Conver
 When a patient initiates a call, the frontend shows a "Setting up your call..." screen. During this time, the backend:
 
 1. **EHR Hydration** — Queries Supabase for the patient's existing records: past visit summaries, conditions, medications, allergies, uploaded reports.
-2. **Document Ingestion** — Any previously uploaded PDFs/reports are processed by Claude (multimodal) to extract structured medical data. Results are cached so they don't need reprocessing on every call.
+2. **Document Ingestion** — Documents are processed at upload time (Day 1 pipeline). During pre-call setup, the system checks for any unprocessed documents (`processed == false` in the `documents` table) and processes them as a fallback. Already-processed documents have their `extracted_data` loaded directly from the database.
 3. **Context Assembly** — Builds the initial context payload: system prompt + patient history + extracted report data. This becomes the seed context for the conversation.
 
 If the patient has no prior data, the system flags this so the virtual doctor knows to start with a full intake (pre-existing conditions, medications, allergies, family history).
@@ -175,9 +175,12 @@ Patient (mic) → WebSocket → Backend Orchestrator
     → WebSocket → Patient (speaker)
 ```
 
-- **Transport:** WebSocket connection between frontend and backend orchestrator. The orchestrator manages the Sarvam and Claude API calls sequentially.
+- **Transport:** WebSocket connection between frontend and backend orchestrator. The backend runs a custom Node.js server (not Next.js API routes, which don't support persistent WebSocket connections) using the `ws` library alongside Next.js. The orchestrator manages the Sarvam and Claude API calls sequentially.
+- **Audio format:** Frontend captures audio via `getUserMedia` → MediaRecorder API, encoded as PCM 16-bit, 16kHz, mono (standard for speech APIs). Chunks are sent as binary WebSocket frames. Exact chunk size depends on Sarvam's ASR requirements — check their docs and default to 4096-byte frames.
+- **Voice Activity Detection (VAD):** For the PoC, use push-to-talk (patient holds a button to speak). This avoids the complexity of silence detection while keeping the pipeline simple. Future: add browser-side VAD (e.g., `@ricky0123/vad-web`) for hands-free conversation.
+- **Fallback:** If Sarvam is unavailable, the system falls back to the text-based chat UI built on Day 2. The backend detects Sarvam API errors and signals the frontend to switch modes.
 - **Latency management:** During Claude inference (1-5s), the orchestrator streams a natural filler via Sarvam TTS ("Let me think about that..." / "Give me a moment..."). These fillers are pre-generated and cached.
-- **Language switching:** Sarvam detects language per utterance. If a patient switches from English to Hindi mid-conversation, the ASR output adjusts automatically. Claude always reasons in English. Responses are translated back to the detected language via Sarvam before TTS.
+- **Language switching:** Sarvam detects language per utterance. If a patient switches from English to Hindi mid-conversation, the ASR output adjusts automatically. For the PoC, Sarvam translates patient speech to English → Claude reasons in English → response is translated back to the detected language via Sarvam before TTS. (Future optimization: test sending Hindi directly to Claude to reduce latency — see Open Questions.)
 
 #### 4.2.2 System Prompt Architecture
 
@@ -229,7 +232,7 @@ The question selection is **not scripted** — Claude dynamically decides the ne
 As the conversation unfolds:
 
 - **Within a session:** Full conversation history is maintained in the Claude API messages array. No summarization within a single session (context window is large enough for a consultation).
-- **Across sessions:** mem0 stores long-term patient memory — key facts, preferences, ongoing conditions. On the next call, mem0 context is injected alongside the EHR data in pre-call setup.
+- **Across sessions:** A cross-session memory layer stores key facts, preferences, and ongoing conditions. For the PoC, implement this as a `session_summaries` query in Supabase (pull prior session summaries into context). If richer memory is needed, upgrade to mem0 post-PoC (see Open Questions #4).
 - **Live structured extraction:** After every 3-4 conversational turns, a background Claude call extracts structured data (Pydantic models) from the conversation so far. This runs async and doesn't block the conversation.
 
 #### 4.2.5 Emergency Detection & Interruption
@@ -239,7 +242,7 @@ Runs as a parallel check on every patient utterance:
 - **Trigger:** Claude evaluates each patient message against emergency criteria as part of its reasoning (not a separate model call — built into the system prompt).
 - **Action on detection:** The virtual doctor immediately interrupts the consultation flow:
   > "I need to pause our conversation. Based on what you're describing — [specific symptoms] — this could be a medical emergency. Please call emergency services or go to your nearest emergency room immediately. Do not wait."
-- **Post-interruption:** Session is flagged in the EHR as "emergency-detected." The conversation can continue if the patient confirms they're safe, but the recommendation is logged.
+- **Post-interruption:** Session status is set to `'emergency'` in the sessions table. The conversation can continue if the patient confirms they're safe, but the recommendation is logged.
 
 ### 4.3 Post-Session Processing
 
@@ -279,8 +282,8 @@ When the call ends:
 │  │       Session State Manager          │   │
 │  │  - Conversation history (messages[]) │   │
 │  │  - EHR context (pre-loaded)          │   │
-│  │  - mem0 long-term memory             │   │
-│  │  - Extracted data (running Pydantic) │   │
+│  │  - Prior session summaries           │   │
+│  │  - Extracted data (running Zod)      │   │
 │  │  - Language preference (auto-detect) │   │
 │  │  - Emergency flag                    │   │
 │  └──────────────────────────────────────┘   │
@@ -318,7 +321,7 @@ The orchestrator holds all state in-memory for the duration of a session. On ses
 | Component | Technology | Notes |
 |---|---|---|
 | **Real-time transport** | WebSocket (via Next.js or ws library) | Audio streaming between frontend and backend |
-| **DB Access from Agent** | MCP Server (custom) | Structured writes to Supabase from the agentic pipeline |
+| **DB Access from Agent** | MCP Server (custom, Node.js) | Thin write layer: the orchestrator calls MCP tools to write structured data to Supabase. Uses `@modelcontextprotocol/sdk` (TypeScript). Exposes tools: `write_visit_record`, `write_session_summary`, `update_patient_record`. Connects to Supabase via `@supabase/supabase-js` with a service role key. |
 | **Deployment (PoC)** | localhost (frontend) + Supabase (backend/DB) | No cloud deployment for PoC |
 
 ### Key API Integrations
@@ -331,12 +334,25 @@ The orchestrator holds all state in-memory for the duration of a session. On ses
 **Claude API (Anthropic)**
 - Messages API with streaming for real-time conversation
 - Multimodal input for PDF/document processing
-- Structured output (tool use or JSON mode) for Pydantic extraction
+- Structured output (tool use or JSON mode) for extraction
 
-**mem0**
-- Add memories after each session
-- Search memories during pre-call setup
-- Scoped per patient ID
+**Model selection by task:**
+
+| Task | Model | Rationale |
+|---|---|---|
+| Virtual doctor conversation | Claude Sonnet 4.5 | Best balance of speed and quality for real-time multi-turn |
+| Document extraction (PDF) | Claude Sonnet 4.5 | Multimodal, strong at structured extraction |
+| Post-session visit extraction | Claude Sonnet 4.5 | Accuracy matters, not latency-sensitive |
+| Eval harness (extraction accuracy) | Claude Sonnet 4.5 | Separate call, needs strong reasoning |
+| Eval harness (conversation quality) | Claude Sonnet 4.5 | Async, quality of judgment matters |
+
+For the PoC, use Sonnet 4.5 across the board. If conversation latency is too high, test Haiku 4.5 for the real-time conversation loop.
+
+**Cross-session memory (PoC approach)**
+- Use Supabase `session_summaries` table — query prior summaries for the patient during pre-call setup
+- Inject last 3-5 session summaries into the system prompt as context
+- No external dependency needed for the PoC
+- Future: evaluate mem0 (cloud or self-hosted) for richer semantic memory if summarized context proves insufficient
 
 ## 6. Data Model
 
@@ -397,6 +413,7 @@ visit_records (
   source          text DEFAULT 'virtual-doctor',
   verified_by     text DEFAULT 'eval-harness',
   confidence_score float,
+  needs_review    boolean DEFAULT false,  -- Set when confidence_score between 0.5 and 0.8
   created_at      timestamptz DEFAULT now()
 );
 
@@ -412,9 +429,41 @@ session_summaries (
 );
 ```
 
-### Pydantic Models (Structured Extraction)
+### Zod Schemas (Structured Extraction)
+
+Since the stack is TypeScript end-to-end, extraction schemas are defined in Zod. The Claude API returns JSON matching these schemas via structured output (tool use). Python Pydantic equivalents can be derived if a Python service is introduced later.
+
+```typescript
+// Document extraction — for uploaded PDFs/reports
+const LabResult = z.object({
+  test_name: z.string(),
+  value: z.string(),
+  unit: z.string().nullable(),
+  reference_range: z.string().nullable(),
+  abnormal: z.boolean(),
+});
+
+const DocumentExtraction = z.object({
+  document_type: z.enum(["lab_report", "prescription", "discharge_summary", "imaging_report", "other"]),
+  date: z.string().nullable(),                    // Date on the document
+  provider: z.string().nullable(),                // Hospital/lab name
+  lab_results: z.array(LabResult).optional(),     // For lab reports
+  medications: z.array(z.object({
+    name: z.string(),
+    dosage: z.string().nullable(),
+    frequency: z.string().nullable(),
+  })).optional(),                                  // For prescriptions
+  diagnoses: z.array(z.string()).optional(),       // For discharge summaries
+  summary: z.string(),                            // Free-text summary of the document
+  raw_findings: z.string().nullable(),            // Full extracted text for context
+});
+
+// Visit extraction — for conversation sessions
+```
 
 ```python
+# Equivalent Pydantic models (reference only — not used in PoC runtime)
+
 class Symptom(BaseModel):
     name: str
     severity: int | None          # 1-10 scale
@@ -531,7 +580,7 @@ The PoC uses LLM-as-judge for both eval types. Future versions will:
 - [ ] Build document upload UI + Supabase Storage integration
 - [ ] Implement Claude API integration for document processing (PDF → structured extraction)
 - [ ] Build basic patient dashboard showing uploaded documents + extracted data
-- [ ] Define Pydantic models (or TypeScript equivalents) for `VisitExtraction`
+- [ ] Define Zod schemas for `DocumentExtraction` and `VisitExtraction`
 
 **Deliverable:** Working auth + upload + extraction pipeline.
 
@@ -573,7 +622,7 @@ The PoC uses LLM-as-judge for both eval types. Future versions will:
 - [ ] Implement extraction eval harness (LLM-as-judge, confidence scoring, pass/fail gate)
 - [ ] Implement conversation quality eval (async, stores scores)
 - [ ] Build session summary generation + display in patient dashboard
-- [ ] Wire up mem0 for cross-session memory (add after session, query before next session)
+- [ ] Implement cross-session memory: query prior session summaries during pre-call setup, inject into context
 - [ ] End-to-end testing: upload docs → start voice call → conversation → EHR write → summary
 - [ ] Bug fixes and UX polish
 
@@ -585,18 +634,16 @@ The PoC uses LLM-as-judge for both eval types. Future versions will:
 
 | # | Question | Context | Impact |
 |---|---|---|---|
-| 1 | **Sarvam streaming latency** | Real-time ASR + TTS adds latency on top of Claude inference. What's the end-to-end round-trip? | May need to adjust filler strategy or consider chunked responses |
-| 2 | **Translation vs. native reasoning** | Should Claude reason in English (with Sarvam translating both directions), or should we send Hindi text directly to Claude? | Claude handles Hindi reasonably well natively — could skip translation for simpler queries. Needs testing. |
-| 3 | **MCP server design** | How much logic lives in the MCP server vs. the orchestrator? Should MCP just be a thin SQL write layer, or should it validate/transform? | Affects Day 4 scope. Recommend thin MCP for PoC. |
-| 4 | **mem0 vs. summarized context** | mem0 adds a dependency. Could we achieve cross-session memory with just a summarized context stored in Supabase? | Simpler approach may suffice for PoC. mem0 adds richer memory but more complexity. |
-| 5 | **Audio chunking strategy** | How do we determine when the patient has finished speaking? Silence detection? Push-to-talk? | Affects UX significantly. Silence detection (VAD) is more natural but harder. |
-| 6 | **Sarvam API pricing & rate limits** | Real-time streaming may hit rate limits or incur significant cost during testing. | Need to check Sarvam's pricing model before Day 3. |
+| 1 | **Sarvam streaming latency** | Real-time ASR + TTS adds latency on top of Claude inference. What's the end-to-end round-trip? | May need to adjust filler strategy or consider chunked responses. **Action:** Benchmark on Day 3 morning before building the full pipeline. |
+| 2 | **Translation vs. native Hindi reasoning** | PoC uses Sarvam for translation (Claude reasons in English). But Claude handles Hindi reasonably well natively — skipping translation could reduce latency. | **Decision:** Use translation for PoC. Benchmark native Hindi reasoning as a Day 3 stretch goal. |
+| 3 | **Sarvam API pricing & rate limits** | Real-time streaming may hit rate limits or incur significant cost during testing. | **Action:** Check Sarvam's pricing model before Day 3. |
+| 4 | **Sarvam ASR streaming protocol** | Does Sarvam support true WebSocket streaming, or is it batch REST with audio file upload? This determines the real-time architecture. | **Action:** Verify against Sarvam docs on Day 3 morning. If batch-only, use turn-based recording (record full utterance → send → get response). |
 
 ### Risks
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| **Latency too high for natural conversation** | Medium | High | Pre-generate filler phrases. Consider Claude Haiku for initial turns, Opus/Sonnet for assessment. Test Sarvam streaming latency early. |
+| **Latency too high for natural conversation** | Medium | High | Pre-generate filler phrases. Fall back to Haiku 4.5 for conversation if Sonnet 4.5 is too slow. Test Sarvam streaming latency early on Day 3. |
 | **Hindi medical terminology accuracy** | Medium | Medium | Claude may not know niche Hindi medical terms. Sarvam translation may lose nuance. Test with common conditions first. |
 | **Structured extraction hallucination** | Medium | High | Eval harness is the mitigation. Low-confidence extractions don't get written to EHR. |
 | **4-day timeline is aggressive** | High | Medium | Prioritize ruthlessly. Day 1-2 are the core. Day 3 voice can fall back to text-only if Sarvam integration takes longer. Day 4 eval can be simplified. |
