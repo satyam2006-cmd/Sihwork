@@ -1,0 +1,237 @@
+{
+  "database": "supabase_example",
+  "description": "Example database schema for Second Opinion AI project",
+  "tables": {
+    "users": {
+      "description": "User accounts and profiles",
+      "primary_key": "id",
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "description": "Unique user identifier"
+        },
+        "email": {
+          "type": "varchar(255)",
+          "nullable": false,
+          "description": "User email address"
+        },
+        "name": {
+          "type": "varchar(255)",
+          "nullable": true,
+          "description": "User full name"
+        },
+        "created_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "description": "Account creation timestamp"
+        },
+        "updated_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "description": "Last update timestamp"
+        },
+        "status": {
+          "type": "varchar(50)",
+          "nullable": false,
+          "description": "Account status (active, inactive, suspended)"
+        }
+      },
+      "indexes": [
+        {
+          "name": "idx_users_email",
+          "columns": ["email"],
+          "unique": true
+        },
+        {
+          "name": "idx_users_created_at",
+          "columns": ["created_at"]
+        }
+      ]
+    },
+    "opinions": {
+      "description": "Medical second opinions requested by users",
+      "primary_key": "id",
+      "foreign_keys": {
+        "user_id": "users.id"
+      },
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "description": "Unique opinion identifier"
+        },
+        "user_id": {
+          "type": "uuid",
+          "nullable": false,
+          "description": "ID of user who requested opinion"
+        },
+        "title": {
+          "type": "varchar(500)",
+          "nullable": false,
+          "description": "Brief title of the case"
+        },
+        "description": {
+          "type": "text",
+          "nullable": false,
+          "description": "Detailed case description"
+        },
+        "status": {
+          "type": "varchar(50)",
+          "nullable": false,
+          "description": "Opinion status (pending, in_review, completed, cancelled)"
+        },
+        "created_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "description": "Request creation timestamp"
+        },
+        "completed_at": {
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "description": "Completion timestamp"
+        },
+        "priority": {
+          "type": "varchar(20)",
+          "nullable": false,
+          "description": "Priority level (low, medium, high, urgent)"
+        }
+      },
+      "indexes": [
+        {
+          "name": "idx_opinions_user_id",
+          "columns": ["user_id"]
+        },
+        {
+          "name": "idx_opinions_status",
+          "columns": ["status"]
+        },
+        {
+          "name": "idx_opinions_created_at",
+          "columns": ["created_at"]
+        }
+      ]
+    },
+    "documents": {
+      "description": "Medical documents uploaded for opinions",
+      "primary_key": "id",
+      "foreign_keys": {
+        "opinion_id": "opinions.id",
+        "uploaded_by": "users.id"
+      },
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "description": "Unique document identifier"
+        },
+        "opinion_id": {
+          "type": "uuid",
+          "nullable": false,
+          "description": "Associated opinion ID"
+        },
+        "uploaded_by": {
+          "type": "uuid",
+          "nullable": false,
+          "description": "User who uploaded the document"
+        },
+        "file_name": {
+          "type": "varchar(500)",
+          "nullable": false,
+          "description": "Original file name"
+        },
+        "file_path": {
+          "type": "varchar(1000)",
+          "nullable": false,
+          "description": "Storage path/URL"
+        },
+        "file_size": {
+          "type": "bigint",
+          "nullable": false,
+          "description": "File size in bytes"
+        },
+        "mime_type": {
+          "type": "varchar(100)",
+          "nullable": false,
+          "description": "File MIME type"
+        },
+        "uploaded_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "description": "Upload timestamp"
+        }
+      },
+      "indexes": [
+        {
+          "name": "idx_documents_opinion_id",
+          "columns": ["opinion_id"]
+        },
+        {
+          "name": "idx_documents_uploaded_by",
+          "columns": ["uploaded_by"]
+        }
+      ]
+    },
+    "reviews": {
+      "description": "Expert reviews of second opinion requests",
+      "primary_key": "id",
+      "foreign_keys": {
+        "opinion_id": "opinions.id",
+        "reviewer_id": "users.id"
+      },
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "description": "Unique review identifier"
+        },
+        "opinion_id": {
+          "type": "uuid",
+          "nullable": false,
+          "description": "Opinion being reviewed"
+        },
+        "reviewer_id": {
+          "type": "uuid",
+          "nullable": false,
+          "description": "Expert reviewer user ID"
+        },
+        "content": {
+          "type": "text",
+          "nullable": false,
+          "description": "Review content and findings"
+        },
+        "recommendation": {
+          "type": "text",
+          "nullable": true,
+          "description": "Expert recommendations"
+        },
+        "created_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "description": "Review creation timestamp"
+        },
+        "updated_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "description": "Last update timestamp"
+        }
+      },
+      "indexes": [
+        {
+          "name": "idx_reviews_opinion_id",
+          "columns": ["opinion_id"]
+        },
+        {
+          "name": "idx_reviews_reviewer_id",
+          "columns": ["reviewer_id"]
+        }
+      ]
+    }
+  },
+  "notes": [
+    "This is an example schema. Update with your actual Supabase database structure.",
+    "All timestamps are in UTC with time zone.",
+    "UUIDs are used as primary keys for better distribution and security.",
+    "Add more tables as your application grows."
+  ]
+}
