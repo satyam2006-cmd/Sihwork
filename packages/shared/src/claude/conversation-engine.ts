@@ -1,6 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { getAnthropicClient } from './client';
 import { buildSystemPrompt, type EHRContext } from '../prompts/system-prompt';
+import { compactIfNeeded } from '../context/compaction';
+import { estimateTokens } from '../context/token-budget';
 import type { ChatMessage } from '../types/index';
 
 // Conversation-time tool definitions for Claude tool_use
@@ -81,18 +83,23 @@ export interface ConversationToolCallbacks {
 export class ConversationEngine {
   private client: Anthropic;
   private systemPrompt: string;
+  private systemPromptTokens: number;
   private ehrContext: EHRContext;
   private messages: Anthropic.MessageParam[] = [];
   private isEmergency = false;
   private emergencyDetails: string | null = null;
   private sessionNotes: Record<string, unknown> = {};
   private callbacks: ConversationToolCallbacks;
+  private conversationSummary: string | null = null;
+  private createdAt: number;
 
   constructor(ehrContext: EHRContext, callbacks?: ConversationToolCallbacks) {
     this.client = getAnthropicClient();
     this.ehrContext = ehrContext;
     this.systemPrompt = buildSystemPrompt(ehrContext);
+    this.systemPromptTokens = estimateTokens(this.systemPrompt);
     this.callbacks = callbacks || {};
+    this.createdAt = Date.now();
   }
 
   async getGreeting(): Promise<{ content: string; isEmergency: boolean }> {
@@ -119,12 +126,31 @@ export class ConversationEngine {
     return { content, isEmergency: false };
   }
 
+  /**
+   * Compact messages if they exceed the token budget.
+   * Mutates this.messages and this.conversationSummary in place.
+   */
+  private async maybeCompact(): Promise<void> {
+    const { messages, summary, wasCompacted } = await compactIfNeeded(
+      this.messages,
+      this.systemPromptTokens,
+      this.conversationSummary,
+    );
+    if (wasCompacted) {
+      this.messages = messages;
+      this.conversationSummary = summary;
+    }
+  }
+
   async sendMessage(userMessage: string): Promise<{
     content: string;
     isEmergency: boolean;
     emergencyDetails: string | null;
   }> {
     this.messages.push({ role: 'user', content: userMessage });
+
+    // Compact before API call if needed
+    await this.maybeCompact();
 
     // Tool_use loop: send → handle tool calls → repeat until end_turn
     let finalContent = '';
@@ -179,6 +205,9 @@ export class ConversationEngine {
     emergencyDetails?: string | null;
   }> {
     this.messages.push({ role: 'user', content: userMessage });
+
+    // Compact before API call if needed
+    await this.maybeCompact();
 
     let finalContent = '';
     let needsToolLoop = true;
@@ -337,5 +366,18 @@ export class ConversationEngine {
 
   getSessionNotes(): Record<string, unknown> {
     return this.sessionNotes;
+  }
+
+  getCreatedAt(): number {
+    return this.createdAt;
+  }
+
+  /**
+   * Clean up resources. Call when the session is done.
+   */
+  destroy(): void {
+    this.messages = [];
+    this.conversationSummary = null;
+    this.sessionNotes = {};
   }
 }

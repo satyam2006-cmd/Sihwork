@@ -116,6 +116,7 @@ export interface ManageDocumentParams {
   document_id?: string;
   status?: 'uploaded' | 'processing' | 'processed' | 'failed';
   extracted_data?: unknown;
+  extracted_summary?: string;
   extraction_error?: string;
   // For get
   verify_owner_user_id?: string;

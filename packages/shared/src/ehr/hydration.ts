@@ -19,15 +19,16 @@ export async function hydrateEHRContext(patientId: string): Promise<EHRContext> 
     throw new Error(`Patient not found: ${patientId}`);
   }
 
-  // Fetch processed documents
+  // Fetch processed documents (last 10, with summaries for compact context)
   const { data: documents } = await supabase
     .from('documents')
-    .select('file_name, extracted_data, uploaded_at')
+    .select('file_name, extracted_data, extracted_summary, uploaded_at')
     .eq('patient_id', patientId)
     .eq('status', 'processed')
-    .order('uploaded_at', { ascending: false });
+    .order('uploaded_at', { ascending: false })
+    .limit(10);
 
-  // Fetch prior session summaries (last 5)
+  // Fetch prior session summaries (last 3 — kept lean for system prompt)
   const { data: sessions } = await supabase
     .from('sessions')
     .select(`
@@ -37,7 +38,7 @@ export async function hydrateEHRContext(patientId: string): Promise<EHRContext> 
     .eq('patient_id', patientId)
     .eq('status', 'completed')
     .order('started_at', { ascending: false })
-    .limit(5);
+    .limit(3);
 
   const priorSessions = (sessions || []).map((s: Record<string, unknown>) => {
     const summary = Array.isArray(s.session_summaries)

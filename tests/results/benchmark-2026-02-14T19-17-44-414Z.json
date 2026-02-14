@@ -1,0 +1,213 @@
+{
+  "timestamp": "2026-02-14T19:17:44.414Z",
+  "config": {
+    "hardSampleCount": 2,
+    "conversationEvalCount": 1,
+    "concurrency": 1
+  },
+  "thresholds": {
+    "extraction_faithfulness": 0.85,
+    "extraction_completeness": 0.75,
+    "extraction_correctness": 0.8,
+    "field_coverage": 0.8,
+    "rouge_vs_soap": 0.2,
+    "conversation_safety": 0.9
+  },
+  "metrics": {
+    "extraction_faithfulness": 0.95,
+    "extraction_completeness": 0.85,
+    "extraction_correctness": 0.9,
+    "extraction_consistency": 0.95,
+    "extraction_overall": 0.91,
+    "field_coverage": 1,
+    "rouge_vs_soap": 0.41040462427745666,
+    "conversation_thoroughness": 0.5,
+    "conversation_empathy": 0.6,
+    "conversation_safety": 0.5,
+    "conversation_accuracy": 0.8,
+    "conversation_follow_up": 0.4,
+    "conversation_overall": 0.55
+  },
+  "successCount": 1,
+  "errorCount": 1,
+  "samples": [
+    {
+      "index": 0,
+      "dialogueLength": 3449,
+      "error": "[\n  {\n    \"received\": \"not specified\",\n    \"code\": \"invalid_enum_value\",\n    \"options\": [\n      \"mild\",\n      \"moderate\",\n      \"severe\"\n    ],\n    \"path\": [\n      \"symptoms\",\n      0,\n      \"severity\"\n    ],\n    \"message\": \"Invalid enum value. Expected 'mild' | 'moderate' | 'severe', received 'not specified'\"\n  }\n]",
+      "conversationEval": {
+        "thoroughness": 0.5,
+        "empathy": 0.6,
+        "safety": 0.5,
+        "accuracy": 0.8,
+        "follow_up_quality": 0.4,
+        "overall_quality": 0.55,
+        "notes": "The doctor demonstrated good knowledge of the patient's complex medical history and accurately presented differential diagnoses. However, thoroughness was limited - the headache complaint (chief concern) was inadequately explored (no questions about severity, frequency, location, triggers, or red flags). Safety concerns include: (1) no specific guidance on headache red flags in pregnancy, (2) vague monitoring plan without concrete next steps, (3) no discussion of delivery planning given previous preeclampsia/IUGR and aortic stenosis. Empathy was moderate - professional but somewhat technical/distant. The follow-up plan lacked specificity regarding headache management, specialist referrals (maternal-fetal medicine, cardiology), blood pressure monitoring protocols, or criteria for seeking urgent care. For a high-risk pregnancy with complex cardiovascular pathology, more detailed multidisciplinary care coordination was needed."
+      }
+    },
+    {
+      "index": 1,
+      "dialogueLength": 3371,
+      "extraction": {
+        "chief_complaint": "Follow-up consultation for patient with history of HHH syndrome diagnosed at age 4, with seizures and abnormal neurological findings",
+        "symptoms": [
+          {
+            "name": "Developmental disabilities - expressive language problems",
+            "severity": "moderate",
+            "duration": "chronic/longstanding",
+            "frequency": "ongoing",
+            "notes": "Confirmed by neuropsychiatric evaluation"
+          },
+          {
+            "name": "Developmental disabilities - attention problems",
+            "severity": "moderate",
+            "duration": "chronic/longstanding",
+            "frequency": "ongoing",
+            "notes": "Confirmed by neuropsychiatric evaluation"
+          },
+          {
+            "name": "Significant myopia",
+            "severity": "moderate",
+            "duration": "chronic",
+            "frequency": "ongoing",
+            "notes": "Vision impairment associated with HHH syndrome"
+          },
+          {
+            "name": "History of seizures",
+            "severity": "moderate",
+            "duration": "chronic",
+            "frequency": "controlled on medication",
+            "notes": "Developed during pregnancy at 22 weeks gestation, currently on carbamazepine"
+          }
+        ],
+        "vitals": {},
+        "assessment": "Patient with HHH syndrome (diagnosed age 4) presenting for routine follow-up. Has history of seizures, developmental disabilities, and significant myopia. Currently managing condition with protein-restricted diet (1.5 g/kg/d) and carbamazepine for seizure control. Patient has successfully delivered three children despite metabolic condition, with monitoring for hyperammonemia during pregnancies. Growth parameters show chronic effects: weight at 25th percentile, height less than 3rd percentile. Multiple small brain calcifications noted on prior imaging. Patient appears stable on current regimen.",
+        "diagnoses": [
+          {
+            "condition": "HHH syndrome (Hyperornithinemia-Hyperammonemia-Homocitrullinuria syndrome)",
+            "confidence": "confirmed"
+          },
+          {
+            "condition": "Developmental disabilities (expressive language and attention deficits)",
+            "confidence": "confirmed"
+          },
+          {
+            "condition": "Seizure disorder",
+            "confidence": "confirmed"
+          },
+          {
+            "condition": "Myopia",
+            "confidence": "confirmed"
+          },
+          {
+            "condition": "Growth restriction/short stature",
+            "confidence": "confirmed"
+          },
+          {
+            "condition": "Cerebral calcifications",
+            "confidence": "confirmed"
+          }
+        ],
+        "recommendations": [
+          {
+            "type": "medication",
+            "description": "Continue carbamazepine for seizure control",
+            "urgency": "routine"
+          },
+          {
+            "type": "lifestyle",
+            "description": "Maintain prescribed protein-restricted diet (1.5 g/kg/d)",
+            "urgency": "routine"
+          },
+          {
+            "type": "test",
+            "description": "Monitor blood ammonia levels periodically",
+            "urgency": "routine"
+          },
+          {
+            "type": "test",
+            "description": "Monitor ornithine levels",
+            "urgency": "routine"
+          },
+          {
+            "type": "follow_up",
+            "description": "Continue monitoring children's growth and development, particularly third child after transient respiratory distress",
+            "urgency": "routine"
+          },
+          {
+            "type": "other",
+            "description": "Patient instructed to reach out if experiencing concerning symptoms",
+            "urgency": "routine"
+          }
+        ],
+        "follow_up": "Routine follow-up to monitor HHH syndrome management, seizure control, and children's development. Patient should continue current medication and dietary regimen and contact clinic if any concerning symptoms develop.",
+        "red_flags": [
+          "History of multiple small brain calcifications of unreported cause",
+          "Risk of hyperammonemia, particularly during metabolic stress",
+          "Third child had transient respiratory distress at birth (requires monitoring)"
+        ],
+        "medication_changes": [
+          {
+            "medication": "Carbamazepine",
+            "action": "continue",
+            "details": "For seizure control, started at 22 weeks gestation during first pregnancy"
+          }
+        ]
+      },
+      "extractionEval": {
+        "faithfulness": 0.95,
+        "completeness": 0.85,
+        "correctness": 0.9,
+        "consistency": 0.95,
+        "overall_confidence": 0.91,
+        "issues": [
+          {
+            "field": "symptoms[3].frequency",
+            "issue": "Transcript does not explicitly state seizures are currently 'controlled on medication' - only that carbamazepine was started during pregnancy",
+            "severity": "minor"
+          },
+          {
+            "field": "symptoms[3].notes",
+            "issue": "States 'currently on carbamazepine' but transcript doesn't confirm current medication status, only historical prescription",
+            "severity": "minor"
+          },
+          {
+            "field": "assessment",
+            "issue": "States 'Patient appears stable on current regimen' which is an inference not explicitly stated in transcript",
+            "severity": "minor"
+          },
+          {
+            "field": "recommendations",
+            "issue": "Missing explicit mention of sodium benzoate treatment (was given postpartum after second child) - unclear if this is ongoing or was one-time",
+            "severity": "moderate"
+          },
+          {
+            "field": "pregnancy history",
+            "issue": "Detailed pregnancy history (3 pregnancies with complications) is not captured in structured format, only referenced in various fields",
+            "severity": "moderate"
+          },
+          {
+            "field": "second_child_ornithine_levels",
+            "issue": "Important finding of elevated ornithine in cord blood (302 μM/L) mentioned in transcript but not captured in structured data",
+            "severity": "moderate"
+          },
+          {
+            "field": "treatment_history",
+            "issue": "Sodium benzoate and IV arginine treatment postpartum after second child not included in medication_changes or recommendations",
+            "severity": "moderate"
+          },
+          {
+            "field": "children_outcomes",
+            "issue": "First child: IUGR with weight <3rd percentile, normal development at 2 years; Second child: normal at 10 months - these outcomes could be better structured",
+            "severity": "minor"
+          }
+        ]
+      },
+      "fieldCoverage": {
+        "coverage": 1,
+        "missing": []
+      },
+      "rougeVsSoap": 0.41040462427745666
+    }
+  ]
+}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { getSession, updateSession } from "@mcp/tools/index";
 import { runPostSessionAgent } from "@mcp/post-session-agent";
+import { hydrateEHRContext, serializeEHRContext } from "@second-opinion/shared";
 
 export async function POST(
   _request: NextRequest,
@@ -34,8 +35,18 @@ export async function POST(
       complete: true,
     });
 
-    // 2. Run the agentic post-session pipeline
-    const result = await runPostSessionAgent(sessionId, patientId, transcript);
+    // 2. Hydrate EHR context for temporal awareness
+    let serializedEHR: string | undefined;
+    try {
+      const ehrContext = await hydrateEHRContext(patientId);
+      serializedEHR = serializeEHRContext(ehrContext);
+    } catch (err) {
+      console.error("Failed to hydrate EHR context for post-session:", err);
+      // Continue without EHR context — extraction still works, just less temporal awareness
+    }
+
+    // 3. Run the agentic post-session pipeline
+    const result = await runPostSessionAgent(sessionId, patientId, transcript, serializedEHR);
 
     // Log any errors (non-blocking)
     if (result.errors.length > 0) {

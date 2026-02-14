@@ -1,3 +1,5 @@
+import { TOKEN_BUDGET, estimateTokens } from '../context/token-budget';
+
 export interface EHRContext {
   patient: {
     full_name: string;
@@ -11,6 +13,7 @@ export interface EHRContext {
   documents: Array<{
     file_name: string;
     extracted_data: Record<string, unknown> | null;
+    extracted_summary?: string | null;
     uploaded_at: string;
   }>;
   priorSessions: Array<{
@@ -21,10 +24,7 @@ export interface EHRContext {
   }>;
 }
 
-export function buildSystemPrompt(ehrContext: EHRContext): string {
-  const sections: string[] = [];
-
-  sections.push(`You are Dr. AI, a thorough and empathetic virtual doctor providing second opinions. You are conducting a medical consultation.
+const PERSONA_SECTION = `You are Dr. AI, a thorough and empathetic virtual doctor providing second opinions. You are conducting a medical consultation.
 
 PERSONA:
 - You are warm, professional, and thorough
@@ -51,7 +51,7 @@ CRITICAL RULES:
 TOOLS:
 - Use the flag_emergency tool when the patient describes symptoms requiring immediate medical attention
 - Use the update_session_notes tool every few turns to progressively capture clinical observations
-- Use the get_patient_context tool when you need to reference specific patient details
+- Use the get_patient_context tool when you need to look up document details or prior session history
 
 EMERGENCY DETECTION - Use the flag_emergency tool if patient mentions:
 - Chest pain with shortness of breath
@@ -60,46 +60,71 @@ EMERGENCY DETECTION - Use the flag_emergency tool if patient mentions:
 - Severe allergic reaction (throat swelling, difficulty breathing)
 - Active suicidal ideation
 - Severe bleeding or trauma
-- Loss of consciousness`);
+- Loss of consciousness`;
 
-  // Patient context
+/**
+ * Build a token-aware system prompt.
+ *
+ * Always included (safety-critical): demographics, allergies, medications, conditions.
+ * Included if budget allows: document summaries (newest first), prior session key findings.
+ * Full document data and session details are lazy-loaded via the get_patient_context tool.
+ */
+export function buildSystemPrompt(ehrContext: EHRContext, tokenBudget?: number): string {
+  const budget = tokenBudget ?? TOKEN_BUDGET.ehr_context;
+  const sections: string[] = [PERSONA_SECTION];
+
+  // ── Always included: demographics + safety-critical fields ──
   const p = ehrContext.patient;
-  sections.push(`\nPATIENT INFORMATION:
+  const patientSection = `\nPATIENT INFORMATION:
 - Name: ${p.full_name}
 - Date of Birth: ${p.date_of_birth || 'Not provided'}
 - Gender: ${p.gender || 'Not provided'}
 - Blood Type: ${p.blood_type || 'Not provided'}
 - Allergies: ${p.allergies.length > 0 ? p.allergies.join(', ') : 'None recorded'}
 - Chronic Conditions: ${p.chronic_conditions.length > 0 ? p.chronic_conditions.join(', ') : 'None recorded'}
-- Current Medications: ${p.current_medications.length > 0 ? p.current_medications.join(', ') : 'None recorded'}`);
+- Current Medications: ${p.current_medications.length > 0 ? p.current_medications.join(', ') : 'None recorded'}`;
 
-  // Document extractions
-  if (ehrContext.documents.length > 0) {
-    sections.push('\nMEDICAL DOCUMENTS ON FILE:');
+  sections.push(patientSection);
+
+  // Track remaining EHR budget (persona is counted separately under system_prompt budget)
+  let remainingBudget = budget - estimateTokens(patientSection);
+
+  // ── Document summaries (newest first, only if we have budget) ──
+  if (ehrContext.documents.length > 0 && remainingBudget > 200) {
+    const docLines: string[] = ['\nMEDICAL DOCUMENTS ON FILE:'];
     for (const doc of ehrContext.documents) {
-      sections.push(`\n--- ${doc.file_name} (uploaded ${new Date(doc.uploaded_at).toLocaleDateString()}) ---`);
-      if (doc.extracted_data) {
-        sections.push(JSON.stringify(doc.extracted_data, null, 2));
-      } else {
-        sections.push('(Not yet processed)');
+      const summary = doc.extracted_summary || '(Use get_patient_context tool to view details)';
+      const line = `- ${doc.file_name} (${new Date(doc.uploaded_at).toLocaleDateString()}): ${summary}`;
+      const lineCost = estimateTokens(line);
+
+      if (remainingBudget - lineCost < 100) {
+        docLines.push(`- ... and ${ehrContext.documents.length - docLines.length + 1} more documents (use get_patient_context tool to view)`);
+        break;
       }
+
+      docLines.push(line);
+      remainingBudget -= lineCost;
     }
+    docLines.push('(Use the get_patient_context tool with fields=["documents"] for full document details)');
+    sections.push(docLines.join('\n'));
   }
 
-  // Prior sessions
-  if (ehrContext.priorSessions.length > 0) {
-    sections.push('\nPRIOR CONSULTATION HISTORY:');
+  // ── Prior session key findings (most recent first, only key_findings) ──
+  if (ehrContext.priorSessions.length > 0 && remainingBudget > 200) {
+    const sessionLines: string[] = ['\nPRIOR CONSULTATION HISTORY:'];
     for (const session of ehrContext.priorSessions) {
-      sections.push(`\n--- Session on ${new Date(session.started_at).toLocaleDateString()} ---`);
-      if (session.summary_text) {
-        sections.push(`Summary: ${session.summary_text}`);
-      }
       if (session.key_findings && session.key_findings.length > 0) {
-        sections.push(`Key Findings: ${session.key_findings.join('; ')}`);
+        const line = `- Session ${new Date(session.started_at).toLocaleDateString()}: ${session.key_findings.join('; ')}`;
+        const lineCost = estimateTokens(line);
+
+        if (remainingBudget - lineCost < 50) break;
+
+        sessionLines.push(line);
+        remainingBudget -= lineCost;
       }
-      if (session.follow_up_items && session.follow_up_items.length > 0) {
-        sections.push(`Follow-up Items: ${session.follow_up_items.join('; ')}`);
-      }
+    }
+    if (sessionLines.length > 1) {
+      sections.push(sessionLines.join('\n'));
     }
   }
 

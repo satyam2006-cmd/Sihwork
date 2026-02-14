@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { getAnthropicClient } from '@second-opinion/shared';
 import type { ChatMessage } from '@second-opinion/shared';
+import { compactTranscript } from '@second-opinion/shared';
 import { writeVisitRecord } from './tools/write-visit-record';
 import { writeSessionSummary } from './tools/write-session-summary';
 import { updatePatient } from './tools/update-patient';
@@ -13,6 +14,12 @@ const POST_SESSION_SYSTEM_PROMPT = `You are a medical documentation AI agent. Yo
 3. WRITE the visit record using the write_visit_record tool
 4. GENERATE a clinical summary using the write_session_summary tool
 5. UPDATE the patient record if new conditions or medications were identified using the update_patient tool
+
+TEMPORAL RULES:
+- The user message may include PRE-EXISTING PATIENT HISTORY — this is background context only
+- Extract findings ONLY from TODAY'S CONSULTATION TRANSCRIPT
+- If a value appears in the patient history and is merely referenced in the conversation, it is NOT a new finding
+- Clearly distinguish "history of [X]" from "currently presents with [Y]"
 
 EXTRACTION GUIDELINES:
 - Extract ONLY information explicitly discussed in the transcript
@@ -144,6 +151,7 @@ export async function runPostSessionAgent(
   sessionId: string,
   patientId: string,
   transcript: ChatMessage[],
+  ehrContext?: string,
 ): Promise<PostSessionResult> {
   const client = getAnthropicClient();
   const result: PostSessionResult = {
@@ -151,14 +159,21 @@ export async function runPostSessionAgent(
     errors: [],
   };
 
-  const transcriptText = transcript
+  const rawTranscript = transcript
     .map(m => `${m.role === 'user' ? 'Patient' : 'Doctor'}: ${m.content}`)
     .join('\n');
+
+  // Compact long transcripts to stay within token limits (full transcript stays in DB for audit)
+  const transcriptText = await compactTranscript(rawTranscript, 50_000);
+
+  const ehrSection = ehrContext
+    ? `\n\n=== PRE-EXISTING PATIENT HISTORY (before today — reference only, do NOT extract as new) ===\n${ehrContext}\n`
+    : '';
 
   const messages: Anthropic.MessageParam[] = [
     {
       role: 'user',
-      content: `Process the following consultation transcript. Extract clinical data, write a visit record, generate a summary, and update the patient record if applicable.\n\nSession ID: ${sessionId}\nPatient ID: ${patientId}\n\nTRANSCRIPT:\n${transcriptText}`,
+      content: `Process the following consultation transcript. Extract clinical data, write a visit record, generate a summary, and update the patient record if applicable.\n\nSession ID: ${sessionId}\nPatient ID: ${patientId}${ehrSection}\n\n=== TODAY'S CONSULTATION TRANSCRIPT (extract from THIS only) ===\n${transcriptText}`,
     },
   ];
 

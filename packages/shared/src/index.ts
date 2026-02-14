@@ -47,7 +47,14 @@ export { SESSION_SUMMARY_SYSTEM_PROMPT } from './prompts/summary-prompt';
 
 // EHR
 export { hydrateEHRContext } from './ehr/hydration';
+export { serializeEHRContext } from './ehr/serialize';
 
+// Context Management
+export { TOKEN_BUDGET, estimateTokens, estimateMessagesTokens, countTokens } from './context/token-budget';
+export { compactIfNeeded, compactTranscript } from './context/compaction';
+
+export { EmergencyScanner } from './claude/emergency-scanner';
+export type { EmergencyScanResult } from './claude/emergency-scanner';
 export { extractVisitData } from './claude/visit-extractor';
 export { evaluateExtraction, evaluateConversation, shouldWriteToEHR } from './claude/eval-harness';
 export { VISIT_EXTRACTION_SYSTEM_PROMPT } from './prompts/visit-extraction-prompt';

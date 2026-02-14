@@ -1,10 +1,35 @@
 import { NextRequest } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { getSession, updateSession } from "@mcp/tools/index";
-import { ConversationEngine, hydrateEHRContext } from "@second-opinion/shared";
+import { ConversationEngine, hydrateEHRContext, EmergencyScanner } from "@second-opinion/shared";
 
 // In-memory conversation engines per session
 const engines = new Map<string, ConversationEngine>();
+
+// Stateless emergency scanner — shared across all sessions
+const emergencyScanner = new EmergencyScanner();
+
+// Periodic cleanup interval (every 5 minutes)
+const STALE_ENGINE_MS = 60 * 60 * 1000; // 1 hour
+let cleanupInterval: ReturnType<typeof setInterval> | null = null;
+
+function ensureCleanup() {
+  if (cleanupInterval) return;
+  cleanupInterval = setInterval(() => {
+    const now = Date.now();
+    for (const [id, engine] of engines) {
+      if (now - engine.getCreatedAt() > STALE_ENGINE_MS) {
+        engine.destroy();
+        engines.delete(id);
+      }
+    }
+    // Stop interval when no engines remain
+    if (engines.size === 0 && cleanupInterval) {
+      clearInterval(cleanupInterval);
+      cleanupInterval = null;
+    }
+  }, 5 * 60 * 1000);
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,6 +56,7 @@ export async function POST(request: NextRequest) {
       const ehrContext = await hydrateEHRContext(patientId);
       engine = new ConversationEngine(ehrContext);
       engines.set(sessionId, engine);
+      ensureCleanup();
     }
 
     // If no message, send greeting
@@ -55,6 +81,13 @@ export async function POST(request: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
+          // Fire emergency scanner in parallel (zero added latency — Haiku finishes before Sonnet stream)
+          const currentTranscript = engine!.getTranscript();
+          const scannerPromise = emergencyScanner.scan([
+            ...currentTranscript,
+            { id: 'pending', role: 'user' as const, content: message, timestamp: new Date().toISOString() },
+          ]);
+
           const generator = engine!.sendMessageStreaming(message);
 
           for await (const chunk of generator) {
@@ -63,13 +96,20 @@ export async function POST(request: NextRequest) {
                 encoder.encode(`data: ${JSON.stringify({ type: "text", content: chunk.content })}\n\n`)
               );
             } else if (chunk.type === "done") {
+              // Await scanner result and merge with main agent's emergency flag
+              const scanResult = await scannerPromise;
+              const isEmergency = chunk.isEmergency || scanResult.isEmergency;
+              const emergencyDetails = scanResult.isEmergency && !chunk.isEmergency
+                ? JSON.stringify({ source: 'emergency_scanner', ...scanResult })
+                : chunk.emergencyDetails || null;
+
               // Update transcript via tool
               const transcript = engine!.getTranscript();
               await updateSession({
                 session_id: sessionId,
                 transcript,
-                emergency_flagged: chunk.isEmergency || false,
-                emergency_details: chunk.emergencyDetails || null,
+                emergency_flagged: isEmergency,
+                emergency_details: emergencyDetails,
               });
 
               controller.enqueue(
@@ -77,8 +117,8 @@ export async function POST(request: NextRequest) {
                   `data: ${JSON.stringify({
                     type: "done",
                     content: chunk.content,
-                    isEmergency: chunk.isEmergency,
-                    emergencyDetails: chunk.emergencyDetails,
+                    isEmergency,
+                    emergencyDetails,
                   })}\n\n`
                 )
               );
@@ -112,5 +152,41 @@ export async function POST(request: NextRequest) {
       JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
+  }
+}
+
+/**
+ * DELETE handler to clean up a session's engine when the session ends.
+ * Called by the frontend when navigating away or ending a consultation.
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const [user, authError] = await requireAuth();
+    if (authError) return authError;
+
+    const { sessionId } = await request.json();
+    if (!sessionId) {
+      return new Response("sessionId required", { status: 400 });
+    }
+
+    // Verify ownership before cleanup
+    await getSession({
+      session_id: sessionId,
+      verify_owner_user_id: user.id,
+    });
+
+    const engine = engines.get(sessionId);
+    if (engine) {
+      engine.destroy();
+      engines.delete(sessionId);
+    }
+
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch {
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }

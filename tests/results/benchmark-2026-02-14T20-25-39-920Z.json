@@ -1,0 +1,402 @@
+{
+  "timestamp": "2026-02-14T20:25:39.920Z",
+  "config": {
+    "hardSampleCount": 3,
+    "conversationEvalCount": 20,
+    "concurrency": 5
+  },
+  "thresholds": {
+    "extraction_faithfulness": 0.85,
+    "extraction_completeness": 0.75,
+    "extraction_correctness": 0.8,
+    "field_coverage": 0.8,
+    "rouge_vs_soap": 0.2,
+    "conversation_safety": 0.9
+  },
+  "metrics": {
+    "extraction_faithfulness": 0.8833333333333333,
+    "extraction_completeness": 0.7833333333333333,
+    "extraction_correctness": 0.8166666666666668,
+    "extraction_consistency": 0.8999999999999999,
+    "extraction_overall": 0.82,
+    "field_coverage": 0.9333333333333332,
+    "rouge_vs_soap": 0.3492934797563941,
+    "conversation_thoroughness": 0.65,
+    "conversation_empathy": 0.5833333333333334,
+    "conversation_safety": 0.5333333333333333,
+    "conversation_accuracy": 0.8166666666666668,
+    "conversation_follow_up": 0.4833333333333334,
+    "conversation_overall": 0.5833333333333334
+  },
+  "comparison": null,
+  "successCount": 3,
+  "errorCount": 0,
+  "samples": [
+    {
+      "index": 0,
+      "dialogueLength": 3449,
+      "extraction": {
+        "chief_complaint": "Headaches during pregnancy",
+        "symptoms": [
+          {
+            "name": "headaches",
+            "duration": "recent onset ('lately')",
+            "frequency": "not specified",
+            "notes": "No associated visual changes, chest pain, dyspnea, or other neurological symptoms"
+          }
+        ],
+        "vitals": {},
+        "assessment": "36-year-old gravida 2, para 1 woman at 9 weeks gestation presenting with headaches. Patient has significant past medical history including infrarenal aortic stenosis (75% stenosis with hypertrophied collateral vasculature), prior IVF pregnancy complicated by preeclampsia at 27 weeks and fetal growth restriction (delivered by cesarean at 36 weeks, 1900g infant), and chronic hypertension. Currently on aspirin and calcium supplementation. Headaches appear to be isolated symptom without associated red flag features at this time. Differential diagnosis of chronic aortopathy includes congenital abdominal aortic coarctation, fibromuscular dysplasia, or inactive Takayasu's arteritis given absence of clinical signs of neurofibromatosis, tuberculosis, radiation exposure, or active inflammation.",
+        "diagnoses": [
+          {
+            "condition": "Headaches in pregnancy (etiology under evaluation)",
+            "confidence": "confirmed"
+          },
+          {
+            "condition": "Chronic infrarenal aortic stenosis (known diagnosis)",
+            "confidence": "confirmed"
+          }
+        ],
+        "recommendations": [
+          {
+            "type": "medication",
+            "description": "Continue aspirin 100 mg daily",
+            "urgency": "routine"
+          },
+          {
+            "type": "medication",
+            "description": "Continue calcium 1.2 g daily",
+            "urgency": "routine"
+          },
+          {
+            "type": "follow_up",
+            "description": "Regular prenatal check-ups with close monitoring of pregnancy progression",
+            "urgency": "routine"
+          },
+          {
+            "type": "follow_up",
+            "description": "Monitor headaches and symptoms related to aortic stenosis",
+            "urgency": "routine"
+          },
+          {
+            "type": "other",
+            "description": "Patient instructed to report immediately if symptoms change or worsen",
+            "urgency": "urgent"
+          }
+        ],
+        "follow_up": "Continue regular prenatal care with close monitoring. Patient should attend scheduled check-ups and report any changes in headache pattern, new neurological symptoms, chest pain, dyspnea, or other concerning symptoms immediately.",
+        "red_flags": [
+          "High-risk pregnancy given history of preeclampsia and fetal growth restriction",
+          "Significant infrarenal aortic stenosis (75%) requiring close cardiovascular monitoring during pregnancy",
+          "New onset headaches in patient with history of preeclampsia - requires ongoing surveillance"
+        ],
+        "medication_changes": [
+          {
+            "medication": "Aspirin 100 mg daily",
+            "action": "continue",
+            "details": "Maintained for cardiovascular protection and preeclampsia prevention"
+          },
+          {
+            "medication": "Calcium 1.2 g daily",
+            "action": "continue",
+            "details": "Maintained for supplementation during pregnancy"
+          }
+        ]
+      },
+      "extractionEval": {
+        "faithfulness": 0.95,
+        "completeness": 0.85,
+        "correctness": 0.9,
+        "consistency": 0.95,
+        "overall_confidence": 0.91,
+        "issues": [
+          {
+            "field": "vitals",
+            "issue": "Blood pressure values not captured despite chronic hypertension being a key clinical feature and the consultation context discussing preeclampsia and aortic stenosis",
+            "severity": "moderate"
+          },
+          {
+            "field": "assessment",
+            "issue": "The assessment mentions '36 weeks' for delivery timing in one place, which matches the transcript, but could be clearer that this refers to prior pregnancy, not current 9-week pregnancy",
+            "severity": "minor"
+          },
+          {
+            "field": "medical_history",
+            "issue": "Important past medical history elements are embedded in assessment but not captured as separate structured fields (e.g., no dedicated past_medical_history section for infrarenal aortic stenosis, prior preeclampsia, chronic hypertension, claudication)",
+            "severity": "moderate"
+          },
+          {
+            "field": "family_history",
+            "issue": "Family history mentioned in transcript (paternal ischemic heart disease, maternal hypertension) is not captured in extracted data",
+            "severity": "moderate"
+          },
+          {
+            "field": "laboratory_results",
+            "issue": "Laboratory findings mentioned in transcript not captured: urine protein/creatinine ratio (40 mg/mmol), CRP (3.8 mg/L), ESR (16 mm/h), negative vasculitic screen results, normal renal and liver function",
+            "severity": "moderate"
+          },
+          {
+            "field": "imaging_results",
+            "issue": "Ultrasound findings at 34 weeks (estimated fetal weight 94th percentile, normal placental vascular resistance) and CT angiography findings (75% stenosis, hypertrophied internal mammary and epigastric arteries) not captured in dedicated imaging section",
+            "severity": "moderate"
+          },
+          {
+            "field": "obstetric_history",
+            "issue": "Detailed obstetric history (gravida 2, para 1, prior IVF pregnancy, delivery details) not captured in structured obstetric section",
+            "severity": "moderate"
+          },
+          {
+            "field": "diagnoses",
+            "issue": "The term 'Headaches in pregnancy (etiology under evaluation)' is somewhat redundant - this is a symptom being evaluated, not a diagnosis. The known diagnoses like 'chronic hypertension' and 'history of preeclampsia' are missing",
+            "severity": "minor"
+          }
+        ]
+      },
+      "fieldCoverage": {
+        "coverage": 1,
+        "missing": []
+      },
+      "rougeVsSoap": 0.4072164948453608,
+      "conversationEval": {
+        "thoroughness": 0.5,
+        "empathy": 0.6,
+        "safety": 0.7,
+        "accuracy": 0.8,
+        "follow_up_quality": 0.5,
+        "overall_quality": 0.6,
+        "notes": "The doctor demonstrated good knowledge of the patient's complex medical history and conducted a systematic review. However, thoroughness was limited - headache characteristics (severity, location, duration, triggers, red flags) were not explored adequately, which is critical in a high-risk pregnant patient with vascular disease and preeclampsia history. Safety was reasonable with appropriate symptom screening initially, though no specific emergency warning signs were discussed. Empathy was moderate - professional but somewhat clinical in tone without acknowledging the anxiety of a high-risk pregnancy. The differential diagnosis explanation was accurate but potentially overwhelming for the patient without sufficient contextualization. Follow-up recommendations were vague ('continue monitoring,' 'regular check-ups') without specifying frequency, blood pressure monitoring protocols, preeclampsia warning signs, or when exactly to seek urgent care. The plan lacked specificity for managing headaches in this high-risk context and didn't address whether current medications are safe/sufficient."
+      }
+    },
+    {
+      "index": 1,
+      "dialogueLength": 3371,
+      "extraction": {
+        "chief_complaint": "Follow-up visit for patient with history of HHH syndrome diagnosed at age 4",
+        "symptoms": [],
+        "vitals": {},
+        "assessment": "Patient with known HHH syndrome (diagnosed at age 4) presenting for follow-up. History of seizures, abnormal neurological findings, developmental disabilities (expressive language and attention problems), and significant myopia. Patient has delivered three children with various pregnancy-related complications including mild hyperammonemia, gestational seizures, and required protein restriction. Currently appears stable on prescribed diet and medication regimen. This visit focused on reviewing medical and pregnancy history rather than acute concerns.",
+        "diagnoses": [
+          {
+            "condition": "HHH syndrome",
+            "confidence": "confirmed"
+          }
+        ],
+        "recommendations": [
+          {
+            "type": "lifestyle",
+            "description": "Continue prescribed protein-restricted diet",
+            "urgency": "routine"
+          },
+          {
+            "type": "medication",
+            "description": "Maintain current medication regimen",
+            "urgency": "routine"
+          },
+          {
+            "type": "follow_up",
+            "description": "Continue monitoring patient's condition and children's development closely",
+            "urgency": "routine"
+          }
+        ],
+        "follow_up": "Continue routine monitoring of patient's HHH syndrome and ongoing surveillance of children's growth and development",
+        "red_flags": [],
+        "medication_changes": [
+          {
+            "medication": "Current medication regimen",
+            "action": "continue",
+            "details": "Patient instructed to maintain current medications"
+          }
+        ]
+      },
+      "extractionEval": {
+        "faithfulness": 0.75,
+        "completeness": 0.6,
+        "correctness": 0.7,
+        "consistency": 0.85,
+        "overall_confidence": 0.65,
+        "issues": [
+          {
+            "field": "chief_complaint",
+            "issue": "Characterized as 'follow-up visit' but transcript suggests patient is presenting their history, not explicitly stating this is a routine follow-up",
+            "severity": "minor"
+          },
+          {
+            "field": "symptoms",
+            "issue": "Missing historical symptoms explicitly mentioned: seizures, nausea and dizziness during first pregnancy, transient respiratory distress in third child",
+            "severity": "moderate"
+          },
+          {
+            "field": "vitals",
+            "issue": "Growth parameters mentioned (weight at 25th percentile, height <3rd percentile) should be documented but are missing",
+            "severity": "moderate"
+          },
+          {
+            "field": "diagnoses",
+            "issue": "Missing documented conditions: developmental disabilities, myopia, seizure disorder, history of hyperammonemia during pregnancy",
+            "severity": "moderate"
+          },
+          {
+            "field": "medications",
+            "issue": "Carbamazepine mentioned in transcript but not extracted. Sodium benzoate and arginine treatment history not documented",
+            "severity": "critical"
+          },
+          {
+            "field": "medication_changes",
+            "issue": "References 'current medication regimen' without specifying what medications patient is on - this is vague and potentially inaccurate",
+            "severity": "moderate"
+          },
+          {
+            "field": "assessment",
+            "issue": "States 'currently appears stable' but there's no indication of current symptom status or recent lab values in transcript",
+            "severity": "moderate"
+          },
+          {
+            "field": "recommendations",
+            "issue": "Diet details from transcript (1.5 g/kg/d childhood, 40 g/d during pregnancy) not specified in recommendations",
+            "severity": "minor"
+          },
+          {
+            "field": "children_information",
+            "issue": "Important clinical details about children missing: first child's intrauterine growth restriction, second child's elevated cord ornithine (302 μM/L), third child's respiratory distress",
+            "severity": "moderate"
+          },
+          {
+            "field": "pregnancy_complications",
+            "issue": "Brain imaging findings (multiple small calcifications) not documented anywhere in extracted data",
+            "severity": "moderate"
+          }
+        ]
+      },
+      "fieldCoverage": {
+        "coverage": 0.8,
+        "missing": [
+          "symptoms"
+        ]
+      },
+      "rougeVsSoap": 0.23699421965317918,
+      "conversationEval": {
+        "thoroughness": 0.7,
+        "empathy": 0.5,
+        "safety": 0.4,
+        "accuracy": 0.8,
+        "follow_up_quality": 0.4,
+        "overall_quality": 0.5,
+        "notes": "The doctor systematically gathered comprehensive medical history about HHH syndrome and pregnancies with appropriate questions. However, the conversation lacks clinical context - it reads more like a history-taking exercise than an actual consultation addressing current concerns. Major safety concerns: no assessment of current symptoms, seizure control status, or medication adherence; no emergency red flags discussed; no specific follow-up plan given. The empathy is minimal - very transactional with no acknowledgment of the patient's challenging medical journey. The closing is vague ('continue to monitor') without concrete next steps, specific appointment scheduling, or actionable guidance. No discussion of current needs, concerns about future pregnancies, or genetic counseling for children."
+      }
+    },
+    {
+      "index": 2,
+      "dialogueLength": 3344,
+      "extraction": {
+        "chief_complaint": "Coughing up blood for the past three days",
+        "symptoms": [
+          {
+            "name": "Haemoptysis",
+            "severity": "severe",
+            "duration": "3 days",
+            "frequency": "ongoing",
+            "notes": "Patient reports coughing up blood; history of massive haemoptysis last year with no identified disorder"
+          }
+        ],
+        "vitals": {
+          "blood_pressure": "146/72 mmHg",
+          "heart_rate": "86 beats/min",
+          "temperature": "36.6 °C",
+          "respiratory_rate": "20/min",
+          "oxygen_saturation": "95% on room air"
+        },
+        "assessment": "Patient presenting with recurrent haemoptysis. History of hypertension, hyperlipidaemia, atrioventricular block with implanted dual chamber pacemaker. Physical examination unremarkable without coarse crackles. Laboratory tests within normal limits. Imaging reveals consolidation from collapsed right lower lobe and diaphragmatic hernia. Bronchoscopy shows right inferior lobar bronchus filled with blood clots. Bronchial artery angiography demonstrated expanded and meandering bronchial arteries with reticular artery growth from diaphragm arteries. Prior chest CT from 5 years ago showed pulmonary hypoplasia of right inferior lobe. Failed conservative management with two arterial embolizations and endobronchial Watanabe spigot. Proceeded to thoracoscopic right lower lobectomy with specimen showing small hypoaerated, atrophied, and occluded right inferior lobe with underdeveloped irregular bronchus.",
+        "diagnoses": [
+          {
+            "condition": "Recurrent haemoptysis secondary to pulmonary hypoplasia of right inferior lobe",
+            "confidence": "confirmed"
+          },
+          {
+            "condition": "Collapsed right lower lobe with consolidation",
+            "confidence": "confirmed"
+          },
+          {
+            "condition": "Diaphragmatic hernia",
+            "confidence": "confirmed"
+          },
+          {
+            "condition": "Abnormal bronchial and diaphragmatic arterial vasculature",
+            "confidence": "confirmed"
+          }
+        ],
+        "recommendations": [
+          {
+            "type": "follow_up",
+            "description": "Close monitoring of condition with regular follow-up appointments",
+            "urgency": "soon"
+          },
+          {
+            "type": "other",
+            "description": "Post-surgical monitoring and symptom management following thoracoscopic right lower lobectomy",
+            "urgency": "routine"
+          }
+        ],
+        "follow_up": "Regular follow-up appointments to monitor condition closely and manage any symptoms as needed",
+        "red_flags": [
+          "Recurrent haemoptysis despite interventional procedures",
+          "Failed arterial embolizations",
+          "Pulmonary hypoplasia with abnormal vascular anatomy"
+        ],
+        "medication_changes": []
+      },
+      "extractionEval": {
+        "faithfulness": 0.95,
+        "completeness": 0.9,
+        "correctness": 0.85,
+        "consistency": 0.9,
+        "overall_confidence": 0.9,
+        "issues": [
+          {
+            "field": "symptoms.severity",
+            "issue": "The transcript mentions 'massive haemoptysis' occurred last year, but current episode is described as 'coughing up blood' without explicit severity characterization. Labeling current episode as 'severe' may be an interpretation.",
+            "severity": "minor"
+          },
+          {
+            "field": "past_medical_history",
+            "issue": "Past medical history (hypertension, hyperlipidaemia, atrioventricular block, dual chamber pacemaker) and smoking status (non-smoker) are mentioned in transcript but not explicitly captured in structured fields - only referenced in assessment narrative.",
+            "severity": "moderate"
+          },
+          {
+            "field": "symptoms.frequency",
+            "issue": "The term 'ongoing' for frequency is somewhat vague - transcript indicates '3 days' duration but doesn't specify if continuous or intermittent.",
+            "severity": "minor"
+          },
+          {
+            "field": "diagnoses.condition",
+            "issue": "The primary diagnosis synthesizes multiple findings but the exact phrasing 'Recurrent haemoptysis secondary to pulmonary hypoplasia of right inferior lobe' represents clinical interpretation rather than explicitly stated diagnosis in transcript.",
+            "severity": "minor"
+          },
+          {
+            "field": "recommendations.urgency",
+            "issue": "The urgency levels ('soon', 'routine') are interpretations not explicitly stated in the transcript where doctor only says 'monitor closely and follow up regularly'.",
+            "severity": "minor"
+          },
+          {
+            "field": "timeline",
+            "issue": "Procedural timeline could be clearer - multiple interventions occurred (embolizations, spigot placement, then lobectomy) but temporal relationship and whether lobectomy already occurred vs. planned is somewhat ambiguous in extraction.",
+            "severity": "moderate"
+          }
+        ]
+      },
+      "fieldCoverage": {
+        "coverage": 1,
+        "missing": []
+      },
+      "rougeVsSoap": 0.4036697247706422,
+      "conversationEval": {
+        "thoroughness": 0.75,
+        "empathy": 0.65,
+        "safety": 0.5,
+        "accuracy": 0.85,
+        "follow_up_quality": 0.55,
+        "overall_quality": 0.65,
+        "notes": "The doctor demonstrated good diagnostic thoroughness with systematic testing (vitals, labs, imaging, bronchoscopy, angiography) and accurate medical communication. However, there are significant safety concerns: no emergency assessment despite life-threatening hemoptysis, no discussion of warning signs to watch for, and vague post-surgical follow-up instructions. The empathy was adequate but somewhat clinical - brief acknowledgment of patient concerns but limited emotional support for a serious diagnosis requiring surgery. The follow-up plan was too generic ('monitor closely, follow up regularly') without specific instructions about activity restrictions, wound care, or when to seek urgent care. More patient education about the condition and clearer discharge planning would improve quality."
+      }
+    }
+  ]
+}

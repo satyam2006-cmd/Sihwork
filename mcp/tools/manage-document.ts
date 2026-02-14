@@ -58,6 +58,9 @@ export async function manageDocument(params: ManageDocumentParams): Promise<{ do
       if (params.status === 'processed') {
         updates.extracted_data = params.extracted_data || null;
         updates.processed_at = new Date().toISOString();
+        if (params.extracted_summary) {
+          updates.extracted_summary = params.extracted_summary;
+        }
       }
       if (params.status === 'failed') {
         updates.extraction_error = params.extraction_error || 'Unknown error';

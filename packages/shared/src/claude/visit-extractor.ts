@@ -14,8 +14,8 @@ export async function extractVisitData(
     .join('\n');
 
   const userContent = ehrContext
-    ? `EHR CONTEXT:\n${ehrContext}\n\nTRANSCRIPT:\n${transcriptText}`
-    : `TRANSCRIPT:\n${transcriptText}`;
+    ? `=== PRE-EXISTING PATIENT HISTORY (before today — reference only, do NOT extract as new) ===\n${ehrContext}\n\n=== TODAY'S CONSULTATION TRANSCRIPT (extract from THIS only) ===\n${transcriptText}`
+    : `=== TODAY'S CONSULTATION TRANSCRIPT ===\n${transcriptText}`;
 
   const response = await client.messages.create({
     model: 'claude-sonnet-4-5-20250929',
