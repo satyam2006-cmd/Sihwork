@@ -1,0 +1,62 @@
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth";
+import { getSession, updateSession } from "@mcp/tools/index";
+import { runPostSessionAgent } from "@mcp/post-session-agent";
+
+export async function POST(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: sessionId } = await params;
+    const [user, authError] = await requireAuth();
+    if (authError) return authError;
+
+    // Get session with ownership verification
+    const { session } = await getSession({
+      session_id: sessionId,
+      verify_owner_user_id: user.id,
+    });
+
+    const transcript = (session.transcript as Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: string }>) || [];
+    if (transcript.length < 2) {
+      return NextResponse.json(
+        { error: "Session has insufficient transcript for processing" },
+        { status: 400 }
+      );
+    }
+
+    const patientId = session.patient_id as string;
+
+    // 1. Mark session completed
+    await updateSession({
+      session_id: sessionId,
+      complete: true,
+    });
+
+    // 2. Run the agentic post-session pipeline
+    const result = await runPostSessionAgent(sessionId, patientId, transcript);
+
+    // Log any errors (non-blocking)
+    if (result.errors.length > 0) {
+      console.error("Post-session agent errors:", result.errors);
+    }
+
+    return NextResponse.json({
+      success: true,
+      visit_record_id: result.visit_record_id,
+      summary_id: result.summary_id,
+      patient_updated: result.patient_updated,
+      errors: result.errors,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "Session not found") {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
+    console.error("Post-session pipeline error:", error);
+    return NextResponse.json(
+      { error: "Pipeline processing failed" },
+      { status: 500 }
+    );
+  }
+}
