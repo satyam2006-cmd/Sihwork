@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import type { Patient } from "@second-opinion/shared";
@@ -21,58 +21,60 @@ const AuthContext = createContext<AuthContextType>({
   refreshPatient: async () => {},
 });
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [patient, setPatient] = useState<Patient | null>(null);
-  const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+interface AuthProviderProps {
+  children: React.ReactNode;
+  serverUser?: User;
+  serverPatient?: Patient;
+}
 
-  const fetchPatient = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from("patients")
-      .select("*")
-      .eq("user_id", userId)
-      .single();
-    setPatient(data);
-  }, [supabase]);
-
-  const refreshPatient = useCallback(async () => {
-    if (user) {
-      await fetchPatient(user.id);
-    }
-  }, [user, fetchPatient]);
+export function AuthProvider({ children, serverUser, serverPatient }: AuthProviderProps) {
+  const [user, setUser] = useState<User | null>(serverUser ?? null);
+  const [patient, setPatient] = useState<Patient | null>(serverPatient ?? null);
+  const [loading, setLoading] = useState(false);
+  const supabaseRef = useRef(createClient());
 
   useEffect(() => {
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchPatient(session.user.id);
-      }
-      setLoading(false);
-    };
+    const supabase = supabaseRef.current;
 
-    getSession();
-
+    // Only listen for auth changes (sign-in, sign-out, token refresh).
+    // Initial state comes from the server — no client-side getSession() needed.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await fetchPatient(session.user.id);
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+
+        if (currentUser) {
+          const { data } = await supabase
+            .from("patients")
+            .select("*")
+            .eq("user_id", currentUser.id)
+            .single();
+          setPatient(data);
         } else {
           setPatient(null);
         }
+
         setLoading(false);
       }
     );
 
     return () => subscription.unsubscribe();
-  }, [supabase, fetchPatient]);
+  }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await supabaseRef.current.auth.signOut();
     setUser(null);
     setPatient(null);
+  };
+
+  const refreshPatient = async () => {
+    if (!user) return;
+    const { data } = await supabaseRef.current
+      .from("patients")
+      .select("*")
+      .eq("user_id", user.id)
+      .single();
+    setPatient(data);
   };
 
   return (

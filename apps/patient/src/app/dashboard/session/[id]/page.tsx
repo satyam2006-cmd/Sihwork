@@ -29,9 +29,22 @@ interface SummaryData {
 
 interface VisitRecordData {
   chief_complaint: string | null;
+  symptoms: Array<{ name: string; severity?: string; duration?: string }> | null;
   assessment: string | null;
+  diagnoses: Array<{ condition: string; confidence?: string }> | null;
+  recommendations: Array<{ type?: string; description: string; urgency?: string }> | null;
+  follow_up: string | null;
+  red_flags: string[] | null;
+  medication_changes: Array<{ medication: string; change: string }> | null;
   confidence_score: number | null;
   needs_review: boolean;
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 export default function SessionPage() {
@@ -99,9 +112,7 @@ export default function SessionPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Session Details</h2>
-          <p className="text-gray-500">
-            {new Date(session.started_at).toLocaleString()}
-          </p>
+          <p className="text-gray-500">{formatDate(session.started_at)}</p>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant={session.emergency_flagged ? "destructive" : "secondary"}>
@@ -158,19 +169,108 @@ export default function SessionPage() {
               )}
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
             {visitRecord.chief_complaint && (
               <div>
                 <h4 className="text-sm font-medium text-gray-700">Chief Complaint</h4>
                 <p className="text-sm">{visitRecord.chief_complaint}</p>
               </div>
             )}
+
+            {visitRecord.symptoms && visitRecord.symptoms.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Symptoms</h4>
+                <div className="flex flex-wrap gap-2">
+                  {visitRecord.symptoms.map((s, i) => (
+                    <Badge key={i} variant="outline">
+                      {s.name}
+                      {s.severity && ` (${s.severity})`}
+                      {s.duration && ` - ${s.duration}`}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {visitRecord.assessment && (
               <div>
                 <h4 className="text-sm font-medium text-gray-700">Assessment</h4>
                 <p className="text-sm">{visitRecord.assessment}</p>
               </div>
             )}
+
+            {visitRecord.diagnoses && visitRecord.diagnoses.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Diagnoses</h4>
+                <div className="space-y-1">
+                  {visitRecord.diagnoses.map((dx, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm">
+                      <span>{dx.condition}</span>
+                      {dx.confidence && (
+                        <Badge variant={dx.confidence === "confirmed" ? "default" : "secondary"} className="text-xs">
+                          {dx.confidence}
+                        </Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {visitRecord.recommendations && visitRecord.recommendations.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Recommendations</h4>
+                <div className="space-y-2">
+                  {visitRecord.recommendations.map((rec, i) => (
+                    <div key={i} className="flex items-start gap-2 text-sm">
+                      {rec.type && (
+                        <Badge variant="outline" className="text-xs shrink-0">
+                          {rec.type}
+                        </Badge>
+                      )}
+                      <span>{rec.description}</span>
+                      {rec.urgency && rec.urgency !== "routine" && (
+                        <Badge variant={rec.urgency === "urgent" ? "destructive" : "secondary"} className="text-xs shrink-0">
+                          {rec.urgency}
+                        </Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {visitRecord.follow_up && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700">Follow-up Plan</h4>
+                <p className="text-sm">{visitRecord.follow_up}</p>
+              </div>
+            )}
+
+            {visitRecord.red_flags && visitRecord.red_flags.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-red-700">Red Flags</h4>
+                <ul className="list-disc list-inside text-sm text-red-600 space-y-1">
+                  {visitRecord.red_flags.map((flag, i) => (
+                    <li key={i}>{flag}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {visitRecord.medication_changes && visitRecord.medication_changes.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Medication Changes</h4>
+                <div className="space-y-1">
+                  {visitRecord.medication_changes.map((mc, i) => (
+                    <div key={i} className="text-sm">
+                      <span className="font-medium">{mc.medication}</span>: {mc.change}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {visitRecord.needs_review && (
               <Badge variant="secondary">Needs Review</Badge>
             )}

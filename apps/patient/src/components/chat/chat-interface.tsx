@@ -8,6 +8,14 @@ import { EmergencyAlert } from "./emergency-alert";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 interface ChatInterfaceProps {
@@ -30,11 +38,12 @@ export function ChatInterface({ sessionId, mode, existingMessages }: ChatInterfa
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const [initialized, setInitialized] = useState(false);
+  const initializedRef = useRef(false);
+  const [showEndDialog, setShowEndDialog] = useState(false);
 
   useEffect(() => {
-    if (initialized) return;
-    setInitialized(true);
+    if (initializedRef.current) return;
+    initializedRef.current = true;
 
     if (existingMessages && existingMessages.length > 0) {
       // Restore existing messages
@@ -49,7 +58,7 @@ export function ChatInterface({ sessionId, mode, existingMessages }: ChatInterfa
       // Get initial greeting
       getGreeting();
     }
-  }, [initialized, existingMessages, getGreeting, setMessages]);
+  }, [existingMessages, getGreeting, setMessages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -73,21 +82,35 @@ export function ChatInterface({ sessionId, mode, existingMessages }: ChatInterfa
     await endSession();
     toast.success("Session ended. Processing your consultation...");
 
-    // Trigger post-session pipeline
-    try {
-      await fetch(`/api/session/${sessionId}/complete`, {
-        method: "POST",
-      });
-    } catch {
-      // Pipeline runs async, don't block
-    }
+    // Trigger post-session pipeline (don't await - runs in background)
+    fetch(`/api/session/${sessionId}/complete`, { method: "POST" }).catch(() => {});
 
-    router.push(`/dashboard/session/${sessionId}`);
+    router.push("/dashboard/consultation");
     router.refresh();
   };
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
+      {/* End Session Confirmation Dialog */}
+      <Dialog open={showEndDialog} onOpenChange={setShowEndDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>End this session?</DialogTitle>
+            <DialogDescription>
+              This will end your consultation with Dr. AI. A summary and visit record will be generated from your conversation.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEndDialog(false)}>
+              Continue Session
+            </Button>
+            <Button variant="destructive" onClick={() => { setShowEndDialog(false); handleEndSession(); }}>
+              End Session
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
@@ -98,7 +121,7 @@ export function ChatInterface({ sessionId, mode, existingMessages }: ChatInterfa
             Session with Dr. AI
           </p>
         </div>
-        <Button variant="outline" onClick={handleEndSession}>
+        <Button variant="outline" onClick={() => setShowEndDialog(true)}>
           End Session
         </Button>
       </div>

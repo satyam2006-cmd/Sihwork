@@ -9,6 +9,37 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
+function getPasswordStrength(password: string): { score: number; label: string; color: string } {
+  let score = 0;
+  if (password.length >= 6) score++;
+  if (password.length >= 10) score++;
+  if (/[A-Z]/.test(password)) score++;
+  if (/[0-9]/.test(password)) score++;
+  if (/[^A-Za-z0-9]/.test(password)) score++;
+
+  if (score <= 1) return { score: 1, label: "Weak", color: "bg-red-500" };
+  if (score <= 2) return { score: 2, label: "Fair", color: "bg-orange-500" };
+  if (score <= 3) return { score: 3, label: "Good", color: "bg-yellow-500" };
+  return { score: 4, label: "Strong", color: "bg-green-500" };
+}
+
+function PasswordStrength({ password }: { password: string }) {
+  const { score, label, color } = getPasswordStrength(password);
+  return (
+    <div className="space-y-1">
+      <div className="flex gap-1">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className={`h-1 flex-1 rounded-full ${i <= score ? color : "bg-gray-200"}`}
+          />
+        ))}
+      </div>
+      <p className="text-xs text-gray-500">{label}</p>
+    </div>
+  );
+}
+
 export default function SignupPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -38,15 +69,14 @@ export default function SignupPage() {
     }
 
     if (data.user) {
-      // Create patient record
-      const { error: patientError } = await supabase
-        .from("patients")
-        .insert({
-          user_id: data.user.id,
-          full_name: fullName,
-        });
+      // Create patient record via server-side API (bypasses RLS timing issues)
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: data.user.id, fullName }),
+      });
 
-      if (patientError) {
+      if (!res.ok) {
         setError("Account created but failed to set up patient profile. Please contact support.");
         setLoading(false);
         return;
@@ -104,6 +134,9 @@ export default function SignupPage() {
                 minLength={6}
                 required
               />
+              {password.length > 0 && (
+                <PasswordStrength password={password} />
+              )}
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-3">

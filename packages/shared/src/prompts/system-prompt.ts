@@ -75,14 +75,18 @@ export function buildSystemPrompt(ehrContext: EHRContext, tokenBudget?: number):
 
   // ── Always included: demographics + safety-critical fields ──
   const p = ehrContext.patient;
+  const toArray = (v: unknown): string[] => Array.isArray(v) ? v : [];
+  const allergies = toArray(p.allergies);
+  const conditions = toArray(p.chronic_conditions);
+  const medications = toArray(p.current_medications);
   const patientSection = `\nPATIENT INFORMATION:
 - Name: ${p.full_name}
 - Date of Birth: ${p.date_of_birth || 'Not provided'}
 - Gender: ${p.gender || 'Not provided'}
 - Blood Type: ${p.blood_type || 'Not provided'}
-- Allergies: ${p.allergies.length > 0 ? p.allergies.join(', ') : 'None recorded'}
-- Chronic Conditions: ${p.chronic_conditions.length > 0 ? p.chronic_conditions.join(', ') : 'None recorded'}
-- Current Medications: ${p.current_medications.length > 0 ? p.current_medications.join(', ') : 'None recorded'}`;
+- Allergies: ${allergies.length > 0 ? allergies.join(', ') : 'None recorded'}
+- Chronic Conditions: ${conditions.length > 0 ? conditions.join(', ') : 'None recorded'}
+- Current Medications: ${medications.length > 0 ? medications.join(', ') : 'None recorded'}`;
 
   sections.push(patientSection);
 

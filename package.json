@@ -9,6 +9,7 @@
     "dev:doctor": "npm run dev -w apps/doctor",
     "dev:ws": "tsx watch server/ws-server.ts",
     "dev:all": "concurrently \"npm run dev:patient\" \"npm run dev:doctor\" \"npm run dev:ws\"",
+    "dev:kill": "{ lsof -ti :3000; lsof -ti :3001; lsof -ti :3002; } 2>/dev/null | sort -u | xargs kill -9 2>/dev/null; echo 'Ports 3000, 3001, 3002 freed'",
     "test:stress-ehr": "tsx tests/stress-ehr.ts",
     "test:stress-conversation": "tsx tests/stress-conversation.ts",
     "test:eval-extraction": "tsx tests/eval-extraction.ts",
