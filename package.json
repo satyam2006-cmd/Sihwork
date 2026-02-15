@@ -14,7 +14,11 @@
     "test:stress-conversation": "tsx tests/stress-conversation.ts",
     "test:eval-extraction": "tsx tests/eval-extraction.ts",
     "test:seed": "tsx tests/seed-synthea.ts",
-    "test:benchmark": "tsx tests/benchmark.ts"
+    "test:benchmark": "tsx tests/benchmark.ts",
+    "test:visualize": "tsx tests/visualize.ts",
+    "test:benchmark-and-visualize": "tsx tests/benchmark.ts && tsx tests/visualize.ts",
+    "test:medagentbench": "tsx tests/medagentbench.ts",
+    "test:medagentbench-visualize": "tsx tests/visualize.ts -- --medagentbench"
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",

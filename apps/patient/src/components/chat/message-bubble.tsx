@@ -12,7 +12,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     <div className={`flex gap-3 ${isUser ? "justify-end" : "justify-start"}`}>
       {!isUser && (
         <Avatar className="h-8 w-8 shrink-0">
-          <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">
+          <AvatarFallback className="bg-primary/10 text-primary text-xs">
             Dr
           </AvatarFallback>
         </Avatar>
@@ -21,8 +21,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       <div
         className={`max-w-[75%] rounded-lg px-4 py-2.5 text-sm leading-relaxed ${
           isUser
-            ? "bg-blue-600 text-white"
-            : "bg-gray-100 text-gray-900"
+            ? "bg-primary text-primary-foreground"
+            : "bg-muted text-foreground"
         }`}
       >
         {message.content}
@@ -30,7 +30,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
       {isUser && (
         <Avatar className="h-8 w-8 shrink-0">
-          <AvatarFallback className="bg-gray-200 text-gray-700 text-xs">
+          <AvatarFallback className="bg-muted text-muted-foreground text-xs">
             You
           </AvatarFallback>
         </Avatar>

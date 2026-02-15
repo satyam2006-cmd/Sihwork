@@ -5,15 +5,18 @@ import { CONVERSATION_EVAL_SYSTEM_PROMPT } from '../prompts/eval-conversation-pr
 import type { ChatMessage } from '../types/index';
 import type { VisitExtraction } from '../schemas/visit-extraction';
 
+const DEFAULT_MODEL = 'claude-sonnet-4-5-20250929';
+
 export async function evaluateExtraction(
   transcript: ChatMessage[],
   extraction: VisitExtraction,
+  model?: string,
 ): Promise<ExtractionEval> {
   const client = getAnthropicClient();
   const transcriptText = transcript.map(m => `${m.role === 'user' ? 'Patient' : 'Doctor'}: ${m.content}`).join('\n');
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-5-20250929',
+    model: model || DEFAULT_MODEL,
     max_tokens: 2048,
     system: EXTRACTION_EVAL_SYSTEM_PROMPT,
     messages: [{
@@ -31,12 +34,13 @@ export async function evaluateExtraction(
 
 export async function evaluateConversation(
   transcript: ChatMessage[],
+  model?: string,
 ): Promise<ConversationEval> {
   const client = getAnthropicClient();
   const transcriptText = transcript.map(m => `${m.role === 'user' ? 'Patient' : 'Doctor'}: ${m.content}`).join('\n');
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-5-20250929',
+    model: model || DEFAULT_MODEL,
     max_tokens: 2048,
     system: CONVERSATION_EVAL_SYSTEM_PROMPT,
     messages: [{ role: 'user', content: `TRANSCRIPT:\n${transcriptText}` }],

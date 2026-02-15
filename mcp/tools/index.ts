@@ -6,6 +6,7 @@ export { updatePatient, updatePatientDefinition } from './update-patient';
 export { createSession, createSessionDefinition } from './create-session';
 export { getSession, getSessionDefinition } from './get-session';
 export { updateSession, updateSessionDefinition } from './update-session';
+export { deleteSession, deleteSessionDefinition } from './delete-session';
 
 // Clinical Records
 export { listSessions, listSessionsDefinition } from './list-sessions';

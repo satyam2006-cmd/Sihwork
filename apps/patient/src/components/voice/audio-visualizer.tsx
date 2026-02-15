@@ -16,8 +16,8 @@ export function AudioVisualizer({ level, isActive }: AudioVisualizerProps) {
           width: size,
           height: size,
           backgroundColor: isActive
-            ? `rgba(59, 130, 246, ${opacity})`
-            : "rgba(156, 163, 175, 0.1)",
+            ? `oklch(0.55 0.12 234 / ${opacity})`
+            : "oklch(0.55 0.12 234 / 0.05)",
           transform: "translate(-50%, -50%)",
           left: "50%",
           top: "50%",
@@ -29,7 +29,7 @@ export function AudioVisualizer({ level, isActive }: AudioVisualizerProps) {
           style={{
             width: 60,
             height: 60,
-            backgroundColor: "rgba(59, 130, 246, 0.2)",
+            backgroundColor: "oklch(0.55 0.12 234 / 0.2)",
             transform: "translate(-50%, -50%)",
             left: "50%",
             top: "50%",

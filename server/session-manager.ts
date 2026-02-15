@@ -3,6 +3,9 @@ import { ConversationEngine, hydrateEHRContext } from "@second-opinion/shared";
 import { updateSession } from "../mcp/tools/index";
 import { processUtterance, generateGreetingAudio } from "./audio-pipeline";
 
+const INIT_TIMEOUT_MS = 30_000;
+const MAX_AUDIO_SIZE = 10 * 1024 * 1024; // 10MB
+
 export class SessionManager {
   private ws: WebSocket;
   private engine: ConversationEngine | null = null;
@@ -10,6 +13,7 @@ export class SessionManager {
   private patientId: string;
   private language: string = "en";
   private isProcessing: boolean = false;
+  private isEnded: boolean = false;
 
   constructor(ws: WebSocket, sessionId: string, patientId: string) {
     this.ws = ws;
@@ -21,32 +25,47 @@ export class SessionManager {
     try {
       this.sendStatus("setting_up", "Loading your medical history...");
 
-      // Hydrate EHR context
-      const ehrContext = await hydrateEHRContext(this.patientId);
-      this.engine = new ConversationEngine(ehrContext);
+      // Wrap initialization in a timeout so client doesn't hang forever
+      let timer: ReturnType<typeof setTimeout>;
+      const result = await Promise.race([
+        this.doInitialize(),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error("Initialization timed out")), INIT_TIMEOUT_MS);
+        }),
+      ]);
+      clearTimeout(timer!);
 
-      // Get greeting
-      const greeting = await this.engine.getGreeting();
-
-      // Generate greeting audio
-      const greetingAudio = await generateGreetingAudio(greeting.content, "en-IN");
-
-      // Send greeting
-      this.sendMessage({
-        type: "greeting",
-        text: greeting.content,
-        audio: greetingAudio ? greetingAudio.toString("base64") : undefined,
-        sessionId: this.sessionId,
-      });
-
-      this.sendStatus("ready", "Ready for conversation");
-
-      // Save initial transcript
-      await this.saveTranscript();
+      return result;
     } catch (error) {
       console.error("Session initialization error:", error);
       this.sendError("Failed to initialize session. Please try again.");
+      this.sendStatus("failed", "Initialization failed");
     }
+  }
+
+  private async doInitialize(): Promise<void> {
+    // Hydrate EHR context
+    const ehrContext = await hydrateEHRContext(this.patientId);
+    this.engine = new ConversationEngine(ehrContext);
+
+    // Get greeting
+    const greeting = await this.engine.getGreeting();
+
+    // Generate greeting audio
+    const greetingAudio = await generateGreetingAudio(greeting.content, "en-IN");
+
+    // Send greeting
+    this.sendMessage({
+      type: "greeting",
+      text: greeting.content,
+      audio: greetingAudio ? greetingAudio.toString("base64") : undefined,
+      sessionId: this.sessionId,
+    });
+
+    this.sendStatus("ready", "Ready for conversation");
+
+    // Save initial transcript
+    await this.saveTranscript();
   }
 
   async handleAudio(audioBuffer: Buffer): Promise<void> {
@@ -57,6 +76,11 @@ export class SessionManager {
 
     if (this.isProcessing) {
       this.sendError("Still processing previous message");
+      return;
+    }
+
+    if (audioBuffer.byteLength > MAX_AUDIO_SIZE) {
+      this.sendError("Audio too large. Please record a shorter message.");
       return;
     }
 
@@ -76,6 +100,7 @@ export class SessionManager {
       // Send transcript of what user said
       this.sendMessage({
         type: "transcript",
+        role: "user",
         text: result.transcript,
         language: result.language,
       });
@@ -83,6 +108,7 @@ export class SessionManager {
       // Send response
       this.sendMessage({
         type: "transcript",
+        role: "assistant",
         text: result.response,
         audio: result.audioBuffer
           ? result.audioBuffer.toString("base64")
@@ -128,6 +154,7 @@ export class SessionManager {
 
       this.sendMessage({
         type: "transcript",
+        role: "assistant",
         text: content,
       });
 
@@ -154,6 +181,10 @@ export class SessionManager {
   }
 
   async endSession(): Promise<void> {
+    // Guard against double-end (called from both "end" message and "close" event)
+    if (this.isEnded) return;
+    this.isEnded = true;
+
     try {
       await this.saveTranscript();
 
@@ -165,6 +196,10 @@ export class SessionManager {
       });
     } catch (error) {
       console.error("End session error:", error);
+    } finally {
+      // Clean up engine resources
+      this.engine?.destroy();
+      this.engine = null;
     }
   }
 

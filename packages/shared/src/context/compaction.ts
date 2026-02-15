@@ -96,8 +96,20 @@ export async function compactIfNeeded(
     return { messages, summary: existingSummary, wasCompacted: false };
   }
 
-  const olderMessages = messages.slice(0, -KEEP_RECENT_TURNS);
-  const recentMessages = messages.slice(-KEEP_RECENT_TURNS);
+  // Find the split point — ensure recentMessages starts with a user message
+  // so the summary pair + recent messages maintain alternating roles
+  let splitIndex = messages.length - KEEP_RECENT_TURNS;
+  while (splitIndex < messages.length && messages[splitIndex].role !== 'user') {
+    splitIndex++;
+  }
+
+  // If we can't find a good split, keep all messages
+  if (splitIndex >= messages.length - 2) {
+    return { messages, summary: existingSummary, wasCompacted: false };
+  }
+
+  const olderMessages = messages.slice(0, splitIndex);
+  const recentMessages = messages.slice(splitIndex);
 
   // Build the text to summarize: existing summary + older messages
   const olderForSummary: Anthropic.MessageParam[] = [];
@@ -111,7 +123,7 @@ export async function compactIfNeeded(
   const summary = await summarizeMessages(olderForSummary);
 
   // Rebuild messages: summary pair + recent verbatim turns
-  // Ensure the sequence starts with user (API requirement)
+  // recentMessages is guaranteed to start with user role (from split logic above)
   const compactedMessages: Anthropic.MessageParam[] = [
     { role: 'user', content: `[Conversation summary so far]: ${summary}` },
     { role: 'assistant', content: 'I understand. Let me continue from where we left off.' },

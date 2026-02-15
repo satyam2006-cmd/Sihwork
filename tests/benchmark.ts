@@ -14,6 +14,7 @@ import { rougeScore, fieldCoverage, printResultsTable, loadBaseline, saveBaselin
 const HARD_SAMPLE_COUNT = parseInt(process.env.BENCHMARK_SAMPLES || '50', 10);
 const CONVERSATION_EVAL_COUNT = parseInt(process.env.BENCHMARK_CONV_SAMPLES || '20', 10);
 const CONCURRENCY = parseInt(process.env.BENCHMARK_CONCURRENCY || '5', 10);
+const MODEL = process.env.BENCHMARK_MODEL || 'claude-sonnet-4-5-20250929';
 
 const THRESHOLDS = {
   extraction_faithfulness: 0.85,
@@ -161,9 +162,9 @@ function extractionToSOAPString(extraction: VisitExtraction): string {
  * Extract visit data with lenient Zod parsing for benchmarks.
  * Falls back to stripping invalid enum values if strict parse fails.
  */
-async function extractVisitDataLenient(messages: ChatMessage[]): Promise<VisitExtraction> {
+async function extractVisitDataLenient(messages: ChatMessage[], model: string): Promise<VisitExtraction> {
   try {
-    return await extractVisitData(messages);
+    return await extractVisitData(messages, undefined, model);
   } catch (err) {
     // If Zod validation failed, re-extract with raw JSON and do a lenient parse
     const errMsg = err instanceof Error ? err.message : String(err);
@@ -175,7 +176,7 @@ async function extractVisitDataLenient(messages: ChatMessage[]): Promise<VisitEx
     const client = getAnthropicClient();
     const transcriptText = messages.map(m => `${m.role === 'user' ? 'Patient' : 'Doctor'}: ${m.content}`).join('\n');
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+      model,
       max_tokens: 4096,
       system: VISIT_EXTRACTION_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: `TRANSCRIPT:\n${transcriptText}` }],
@@ -239,7 +240,8 @@ async function runWithConcurrency<T>(
 // ---------------------------------------------------------------------------
 
 async function main() {
-  console.log('=== Second Opinion AI — Comprehensive Benchmark ===\n');
+  console.log('=== Second Opinion AI — Comprehensive Benchmark ===');
+  console.log(`Model: ${MODEL}\n`);
 
   // 1. Load and select hard samples (try test split, fall back to validation)
   console.log('Step 1: Loading SOAP samples...');
@@ -277,11 +279,11 @@ async function main() {
       }
 
       // A. Extract visit data (lenient parsing for benchmarks)
-      const extraction = await extractVisitDataLenient(messages);
+      const extraction = await extractVisitDataLenient(messages, MODEL);
       results[i].extraction = extraction;
 
       // B. Claude-as-judge extraction eval
-      const evalResult = await evaluateExtraction(messages, extraction);
+      const evalResult = await evaluateExtraction(messages, extraction, MODEL);
       results[i].extractionEval = evalResult;
 
       // C. Field coverage
@@ -313,7 +315,7 @@ async function main() {
       const messages = dialogueToChatMessages(sample.dialogue);
       if (messages.length === 0) return;
 
-      const convEval = await evaluateConversation(messages);
+      const convEval = await evaluateConversation(messages, MODEL);
       results[i].conversationEval = convEval;
 
       console.log(`  ${tag} OK — safety=${convEval.safety.toFixed(2)} thoroughness=${convEval.thoroughness.toFixed(2)} empathy=${convEval.empathy.toFixed(2)}`);
@@ -399,7 +401,7 @@ async function main() {
   const outputPath = join(resultsDir, `benchmark-${timestamp}.json`);
   const output = {
     timestamp: new Date().toISOString(),
-    config: { hardSampleCount: HARD_SAMPLE_COUNT, conversationEvalCount: CONVERSATION_EVAL_COUNT, concurrency: CONCURRENCY },
+    config: { model: MODEL, hardSampleCount: HARD_SAMPLE_COUNT, conversationEvalCount: CONVERSATION_EVAL_COUNT, concurrency: CONCURRENCY },
     thresholds: THRESHOLDS,
     metrics,
     comparison: comparison ? {

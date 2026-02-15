@@ -324,6 +324,103 @@ export function generateSyntheticPatient(complexity: 'simple' | 'moderate' | 'co
   return { patient: base, documents };
 }
 
+// ---------------------------------------------------------------------------
+// MedAgentBench task loading
+// ---------------------------------------------------------------------------
+
+const MEDAGENTBENCH_GITHUB_BASE = 'https://raw.githubusercontent.com/stanfordmlgroup/MedAgentBench/main/data/';
+const MEDAGENTBENCH_CACHE_DIR = 'medagentbench';
+
+interface MedAgentRawTask {
+  task_id: string;
+  patient_id: string;
+  instruction: string;
+  context?: string;
+  sol: string[];
+}
+
+/**
+ * Load MedAgentBench tasks from GitHub (cached locally).
+ * Downloads test_data_v2.json (300 tasks, 30 per category).
+ */
+export async function loadMedAgentBenchTasks(): Promise<MedAgentRawTask[]> {
+  const cacheDir = join(FIXTURES_DIR, MEDAGENTBENCH_CACHE_DIR);
+  if (!existsSync(cacheDir)) mkdirSync(cacheDir, { recursive: true });
+
+  const cachePath = join(cacheDir, 'test_data_v2.json');
+
+  if (existsSync(cachePath)) {
+    const raw = JSON.parse(readFileSync(cachePath, 'utf-8'));
+    return normalizeMedAgentTasks(raw);
+  }
+
+  console.log('  Downloading MedAgentBench test_data_v2.json...');
+  const url = MEDAGENTBENCH_GITHUB_BASE + 'test_data_v2.json';
+
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) {
+      console.log(`  Retry ${attempt}/3...`);
+      await new Promise(r => setTimeout(r, 2000 * attempt));
+    }
+    try {
+      const resp = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+      if (!resp.ok) {
+        lastError = new Error(`HTTP ${resp.status}`);
+        continue;
+      }
+      const data = await resp.json();
+      writeFileSync(cachePath, JSON.stringify(data, null, 2));
+      console.log(`  Cached MedAgentBench tasks to ${cachePath}`);
+      return normalizeMedAgentTasks(data);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+
+  throw new Error(`Failed to download MedAgentBench tasks: ${lastError?.message}`);
+}
+
+/** Normalize raw task data to consistent format. */
+function normalizeMedAgentTasks(data: unknown): MedAgentRawTask[] {
+  // Data may be an array of tasks or an object with a tasks key
+  let tasks: unknown[];
+  if (Array.isArray(data)) {
+    tasks = data;
+  } else if (data && typeof data === 'object' && 'tasks' in data) {
+    tasks = (data as { tasks: unknown[] }).tasks;
+  } else {
+    // Might be a dict keyed by task ID
+    tasks = Object.values(data as Record<string, unknown>);
+  }
+
+  return tasks.map((t: unknown) => {
+    const raw = t as Record<string, unknown>;
+    const taskId = (raw.task_id || raw.id || '') as string;
+    const patientId = (raw.patient_id || raw.patientId || '') as string;
+    const instruction = (raw.instruction || raw.prompt || raw.question || '') as string;
+    const context = (raw.context || '') as string;
+
+    // sol can be string, string[], or absent
+    let sol: string[];
+    if (Array.isArray(raw.sol)) {
+      sol = raw.sol.map(String);
+    } else if (typeof raw.sol === 'string') {
+      sol = raw.sol ? [raw.sol] : [];
+    } else if (raw.solution !== undefined) {
+      sol = Array.isArray(raw.solution) ? raw.solution.map(String) : [String(raw.solution)];
+    } else {
+      sol = [];
+    }
+
+    return { task_id: taskId, patient_id: patientId, instruction, context: context || undefined, sol };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Synthetic patient generation
+// ---------------------------------------------------------------------------
+
 function generateFakeExtraction(seed: number): Record<string, unknown> {
   const types = ['lab_results', 'imaging', 'prescription', 'discharge_summary'];
   const type = types[seed % types.length];

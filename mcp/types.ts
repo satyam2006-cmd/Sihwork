@@ -66,6 +66,10 @@ export interface UpdateSessionParams {
   complete?: boolean; // shorthand: sets status=completed + ended_at=now()
 }
 
+export interface DeleteSessionParams {
+  session_id: string;
+}
+
 // ─── Clinical Records ───
 
 export interface ListSessionsParams {

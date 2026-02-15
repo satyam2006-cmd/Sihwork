@@ -75,6 +75,8 @@ const CONVERSATION_TOOLS: Anthropic.Tool[] = [
   },
 ];
 
+const MAX_TOOL_LOOPS = 10;
+
 export interface ConversationToolCallbacks {
   onEmergency?: (details: { reason: string; severity: string; recommended_action: string }) => void;
   onSessionNotes?: (notes: Record<string, unknown>) => void;
@@ -92,6 +94,7 @@ export class ConversationEngine {
   private callbacks: ConversationToolCallbacks;
   private conversationSummary: string | null = null;
   private createdAt: number;
+  private messageTimestamps: Map<number, string> = new Map();
 
   constructor(ehrContext: EHRContext, callbacks?: ConversationToolCallbacks) {
     this.client = getAnthropicClient();
@@ -103,27 +106,39 @@ export class ConversationEngine {
   }
 
   async getGreeting(): Promise<{ content: string; isEmergency: boolean }> {
-    const response = await this.client.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 500,
-      system: this.systemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: 'Please greet me and start the consultation. Introduce yourself briefly and ask what brings me in today.',
-        },
-      ],
-      // No tools for greeting — keep it simple
-    });
+    try {
+      const response = await this.client.messages.create({
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 500,
+        system: this.systemPrompt,
+        messages: [
+          {
+            role: 'user',
+            content: 'Please greet me and start the consultation. Introduce yourself briefly and ask what brings me in today.',
+          },
+        ],
+        // No tools for greeting — keep it simple
+      });
 
-    const textContent = response.content.find(c => c.type === 'text');
-    const content = textContent && textContent.type === 'text' ? textContent.text : '';
+      const textContent = response.content.find(c => c.type === 'text');
+      const content = textContent && textContent.type === 'text' ? textContent.text : '';
 
-    // Store as if user initiated
-    this.messages.push({ role: 'user', content: '[Session started]' });
-    this.messages.push({ role: 'assistant', content });
+      // Store as if user initiated
+      this.messages.push({ role: 'user', content: '[Session started]' });
+      this.recordTimestamp(this.messages.length - 1);
+      this.messages.push({ role: 'assistant', content });
+      this.recordTimestamp(this.messages.length - 1);
 
-    return { content, isEmergency: false };
+      return { content, isEmergency: false };
+    } catch (error) {
+      console.error('Greeting generation failed:', error);
+      const fallback = 'Hello! I\'m your AI medical assistant. What brings you in today?';
+      this.messages.push({ role: 'user', content: '[Session started]' });
+      this.recordTimestamp(this.messages.length - 1);
+      this.messages.push({ role: 'assistant', content: fallback });
+      this.recordTimestamp(this.messages.length - 1);
+      return { content: fallback, isEmergency: false };
+    }
   }
 
   /**
@@ -148,21 +163,33 @@ export class ConversationEngine {
     emergencyDetails: string | null;
   }> {
     this.messages.push({ role: 'user', content: userMessage });
+    this.recordTimestamp(this.messages.length - 1);
 
     // Compact before API call if needed
     await this.maybeCompact();
 
     // Tool_use loop: send → handle tool calls → repeat until end_turn
     let finalContent = '';
+    let loopCount = 0;
 
-    while (true) {
-      const response = await this.client.messages.create({
-        model: 'claude-sonnet-4-5-20250929',
-        max_tokens: 1024,
-        system: this.systemPrompt,
-        messages: this.messages,
-        tools: CONVERSATION_TOOLS,
-      });
+    while (loopCount < MAX_TOOL_LOOPS) {
+      loopCount++;
+
+      let response: Anthropic.Message;
+      try {
+        response = await this.client.messages.create({
+          model: 'claude-sonnet-4-5-20250929',
+          max_tokens: 1024,
+          system: this.systemPrompt,
+          messages: this.messages,
+          tools: CONVERSATION_TOOLS,
+        });
+      } catch (error) {
+        console.error('Claude API error in sendMessage:', error);
+        // Remove the user message we added since we can't process it
+        this.messages.pop();
+        throw new Error('AI service temporarily unavailable. Please try again.');
+      }
 
       if (response.stop_reason === 'tool_use') {
         // Collect all content blocks (text + tool_use)
@@ -172,21 +199,41 @@ export class ConversationEngine {
         const toolResults: Anthropic.ToolResultBlockParam[] = [];
         for (const block of response.content) {
           if (block.type === 'tool_use') {
-            const result = this.executeConversationTool(block.name, block.input as Record<string, unknown>);
-            toolResults.push({
-              type: 'tool_result',
-              tool_use_id: block.id,
-              content: JSON.stringify(result),
-            });
+            try {
+              const result = this.executeConversationTool(block.name, block.input as Record<string, unknown>);
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: JSON.stringify(result),
+              });
+            } catch (toolError) {
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: JSON.stringify({ error: String(toolError) }),
+                is_error: true,
+              });
+            }
           }
         }
 
-        this.messages.push({ role: 'user', content: toolResults });
+        if (toolResults.length > 0) {
+          this.messages.push({ role: 'user', content: toolResults });
+        }
+      } else if (response.stop_reason === 'max_tokens') {
+        // Response was truncated — extract what we have and warn
+        const textBlocks = response.content.filter(c => c.type === 'text');
+        finalContent = textBlocks.map(c => c.type === 'text' ? c.text : '').join('');
+        finalContent += '\n\n[I was cut off. Could you ask me to continue?]';
+        this.messages.push({ role: 'assistant', content: finalContent });
+        this.recordTimestamp(this.messages.length - 1);
+        break;
       } else {
         // end_turn — extract text content
         const textBlocks = response.content.filter(c => c.type === 'text');
         finalContent = textBlocks.map(c => c.type === 'text' ? c.text : '').join('');
         this.messages.push({ role: 'assistant', content: finalContent });
+        this.recordTimestamp(this.messages.length - 1);
         break;
       }
     }
@@ -205,41 +252,65 @@ export class ConversationEngine {
     emergencyDetails?: string | null;
   }> {
     this.messages.push({ role: 'user', content: userMessage });
+    this.recordTimestamp(this.messages.length - 1);
 
     // Compact before API call if needed
     await this.maybeCompact();
 
     let finalContent = '';
     let needsToolLoop = true;
+    let loopCount = 0;
 
-    while (needsToolLoop) {
+    while (needsToolLoop && loopCount < MAX_TOOL_LOOPS) {
       needsToolLoop = false;
+      loopCount++;
 
-      const stream = this.client.messages.stream({
-        model: 'claude-sonnet-4-5-20250929',
-        max_tokens: 1024,
-        system: this.systemPrompt,
-        messages: this.messages,
-        tools: CONVERSATION_TOOLS,
-      });
+      let stream: ReturnType<typeof this.client.messages.stream>;
+      try {
+        stream = this.client.messages.stream({
+          model: 'claude-sonnet-4-5-20250929',
+          max_tokens: 1024,
+          system: this.systemPrompt,
+          messages: this.messages,
+          tools: CONVERSATION_TOOLS,
+        });
+      } catch (error) {
+        console.error('Claude API error in sendMessageStreaming:', error);
+        this.messages.pop();
+        throw new Error('AI service temporarily unavailable. Please try again.');
+      }
 
-      const contentBlocks: Anthropic.ContentBlock[] = [];
       let currentText = '';
 
-      for await (const event of stream) {
-        if (event.type === 'content_block_delta') {
-          if (event.delta.type === 'text_delta') {
-            currentText += event.delta.text;
-            yield { type: 'text', content: event.delta.text };
+      try {
+        for await (const event of stream) {
+          if (event.type === 'content_block_delta') {
+            if (event.delta.type === 'text_delta') {
+              currentText += event.delta.text;
+              yield { type: 'text', content: event.delta.text };
+            }
           }
-        } else if (event.type === 'content_block_stop') {
-          // Collect completed blocks from the stream
         }
+      } catch (error) {
+        console.error('Claude streaming error:', error);
+        this.messages.pop();
+        throw new Error('AI service connection lost. Please try again.');
       }
 
       // Get final message to check for tool use
-      const finalMessage = await stream.finalMessage();
-      contentBlocks.push(...finalMessage.content);
+      let finalMessage: Anthropic.Message;
+      try {
+        finalMessage = await stream.finalMessage();
+      } catch (error) {
+        console.error('Failed to get final message from stream:', error);
+        // Use whatever text we collected so far
+        if (currentText) {
+          this.messages.push({ role: 'assistant', content: currentText });
+          this.recordTimestamp(this.messages.length - 1);
+          finalContent = currentText;
+        }
+        break;
+      }
 
       if (finalMessage.stop_reason === 'tool_use') {
         // Process tool calls silently (no streaming for tool execution)
@@ -248,24 +319,35 @@ export class ConversationEngine {
         const toolResults: Anthropic.ToolResultBlockParam[] = [];
         for (const block of finalMessage.content) {
           if (block.type === 'tool_use') {
-            const result = this.executeConversationTool(block.name, block.input as Record<string, unknown>);
-            toolResults.push({
-              type: 'tool_result',
-              tool_use_id: block.id,
-              content: JSON.stringify(result),
-            });
+            try {
+              const result = this.executeConversationTool(block.name, block.input as Record<string, unknown>);
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: JSON.stringify(result),
+              });
+            } catch (toolError) {
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: JSON.stringify({ error: String(toolError) }),
+                is_error: true,
+              });
+            }
           }
         }
 
-        this.messages.push({ role: 'user', content: toolResults });
+        if (toolResults.length > 0) {
+          this.messages.push({ role: 'user', content: toolResults });
+        }
         needsToolLoop = true;
         currentText = ''; // Reset for next iteration
       } else {
         finalContent = currentText;
+        this.messages.push({ role: 'assistant', content: finalContent });
+        this.recordTimestamp(this.messages.length - 1);
       }
     }
-
-    this.messages.push({ role: 'assistant', content: finalContent });
 
     yield {
       type: 'done',
@@ -307,13 +389,21 @@ export class ConversationEngine {
       case 'flag_emergency': {
         this.isEmergency = true;
         this.emergencyDetails = JSON.stringify(input);
-        this.callbacks.onEmergency?.(input as { reason: string; severity: string; recommended_action: string });
+        try {
+          this.callbacks.onEmergency?.(input as { reason: string; severity: string; recommended_action: string });
+        } catch (e) {
+          console.error('onEmergency callback error:', e);
+        }
         return { flagged: true, message: 'Emergency flagged successfully' };
       }
 
       case 'update_session_notes': {
         this.sessionNotes = { ...this.sessionNotes, ...input };
-        this.callbacks.onSessionNotes?.(this.sessionNotes);
+        try {
+          this.callbacks.onSessionNotes?.(this.sessionNotes);
+        } catch (e) {
+          console.error('onSessionNotes callback error:', e);
+        }
         return { updated: true };
       }
 
@@ -322,18 +412,26 @@ export class ConversationEngine {
     }
   }
 
+  private recordTimestamp(index: number): void {
+    this.messageTimestamps.set(index, new Date().toISOString());
+  }
+
   getTranscript(): ChatMessage[] {
     // Flatten the multi-block messages into simple text messages
     const result: ChatMessage[] = [];
     let index = 0;
 
-    for (const msg of this.messages) {
+    for (let i = 0; i < this.messages.length; i++) {
+      const msg = this.messages[i];
+      // Use recorded timestamp if available, fallback to now
+      const timestamp = this.messageTimestamps.get(i) || new Date().toISOString();
+
       if (typeof msg.content === 'string') {
         result.push({
           id: `msg-${index++}`,
           role: msg.role as 'user' | 'assistant',
           content: msg.content,
-          timestamp: new Date().toISOString(),
+          timestamp,
         });
       } else if (Array.isArray(msg.content)) {
         // Extract text from content blocks, skip tool_use and tool_result blocks
@@ -351,7 +449,7 @@ export class ConversationEngine {
             id: `msg-${index++}`,
             role: msg.role as 'user' | 'assistant',
             content: textParts.join(''),
-            timestamp: new Date().toISOString(),
+            timestamp,
           });
         }
       }
@@ -379,5 +477,6 @@ export class ConversationEngine {
     this.messages = [];
     this.conversationSummary = null;
     this.sessionNotes = {};
+    this.messageTimestamps.clear();
   }
 }

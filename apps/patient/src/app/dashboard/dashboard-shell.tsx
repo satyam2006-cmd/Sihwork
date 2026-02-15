@@ -1,16 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
-import { createClient } from "@/lib/supabase";
+import { useAuth } from "@/providers/auth-provider";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: "🏠" },
   { href: "/dashboard/documents", label: "Documents", icon: "📄" },
+  { href: "/dashboard/sessions", label: "Sessions", icon: "📋" },
   { href: "/dashboard/consultation", label: "Consultation", icon: "💬" },
 ];
 
@@ -22,19 +22,19 @@ interface DashboardShellProps {
 
 export function DashboardShell({ children, userEmail, patientName }: DashboardShellProps) {
   const pathname = usePathname();
-  const router = useRouter();
+  const { signOut } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (!patientName) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
         <h2 className="text-xl font-semibold">Patient profile not found</h2>
-        <p className="text-gray-500 text-center max-w-md">
+        <p className="text-muted-foreground text-center max-w-md">
           Your account doesn&apos;t have a patient profile. Please sign out and create a new account.
         </p>
         <Button variant="outline" onClick={async () => {
-          await createClient().auth.signOut();
-          router.push("/login");
+          await signOut();
+          window.location.href = "/login";
         }}>Sign Out</Button>
       </div>
     );
@@ -47,45 +47,59 @@ export function DashboardShell({ children, userEmail, patientName }: DashboardSh
     .toUpperCase();
 
   const handleSignOut = async () => {
-    await createClient().auth.signOut();
-    router.push("/login");
+    await signOut();
+    window.location.href = "/login";
   };
 
   const sidebarContent = (
     <>
-      <div className="p-6">
-        <h1 className="text-lg font-bold">Second Opinion AI</h1>
-        <p className="text-sm text-gray-500">Patient Portal</p>
+      <div className="px-6 py-5">
+        <h1 className="text-lg font-bold tracking-tight text-foreground">Second Opinion AI</h1>
+        <p className="text-xs font-medium text-primary/70 mt-0.5">Patient Portal</p>
       </div>
-      <Separator />
-      <nav className="flex-1 p-4 space-y-1">
-        {navItems.map((item) => (
-          <Link key={item.href} href={item.href} onClick={() => setSidebarOpen(false)}>
-            <div
-              className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                pathname === item.href
-                  ? "bg-gray-200 font-medium"
-                  : "hover:bg-gray-100"
+      <div className="mx-4 border-b border-sidebar-border" />
+      <nav className="flex-1 p-3 space-y-1 mt-2">
+        {navItems.map((item) => {
+          const isActive = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setSidebarOpen(false)}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors duration-150 ${
+                isActive
+                  ? "bg-primary/10 font-semibold text-primary border-l-3 border-primary"
+                  : "hover:bg-accent text-muted-foreground hover:text-foreground"
               }`}
             >
-              <span>{item.icon}</span>
+              <span className="text-base">{item.icon}</span>
               {item.label}
-            </div>
-          </Link>
-        ))}
+            </Link>
+          );
+        })}
       </nav>
-      <Separator />
+      <div className="mx-4 border-b border-sidebar-border" />
       <div className="p-4">
-        <div className="flex items-center gap-3 mb-3">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+        <div className="flex items-center gap-3 p-2.5 rounded-lg bg-sidebar-accent/50 mb-3">
+          <Avatar className="h-9 w-9 ring-2 ring-primary/20">
+            <AvatarFallback className="text-xs font-semibold bg-primary/10 text-primary">{initials}</AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{patientName}</p>
-            <p className="text-xs text-gray-500 truncate">{userEmail}</p>
+            <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
           </div>
         </div>
-        <Button variant="outline" size="sm" className="w-full" onClick={handleSignOut}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full text-muted-foreground hover:text-foreground hover:bg-accent justify-start gap-2"
+          onClick={handleSignOut}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
           Sign Out
         </Button>
       </div>
@@ -95,7 +109,7 @@ export function DashboardShell({ children, userEmail, patientName }: DashboardSh
   return (
     <div className="min-h-screen flex">
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-64 border-r bg-gray-50/50 flex-col shrink-0">
+      <aside className="hidden md:flex w-64 border-r border-sidebar-border bg-sidebar flex-col shrink-0">
         {sidebarContent}
       </aside>
 
@@ -109,7 +123,7 @@ export function DashboardShell({ children, userEmail, patientName }: DashboardSh
 
       {/* Mobile sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r flex flex-col transform transition-transform duration-200 ease-in-out md:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r border-sidebar-border flex flex-col transform transition-transform duration-200 ease-in-out md:hidden ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -121,7 +135,7 @@ export function DashboardShell({ children, userEmail, patientName }: DashboardSh
         <div className="md:hidden flex items-center gap-3 border-b px-4 py-3">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-1 -ml-1 rounded-md hover:bg-gray-100"
+            className="p-1 -ml-1 rounded-md hover:bg-accent transition-colors"
             aria-label="Open menu"
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

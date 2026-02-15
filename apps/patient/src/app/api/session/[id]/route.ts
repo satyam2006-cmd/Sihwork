@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
-import { getSession, updateSession } from "@mcp/tools/index";
+import { getSession, updateSession, deleteSession } from "@mcp/tools/index";
 
 // Get session details
 export async function GET(
@@ -65,6 +65,34 @@ export async function PATCH(
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
     console.error("Session update error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+// Delete session
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const [user, authError] = await requireAuth();
+    if (authError) return authError;
+
+    // Verify ownership
+    await getSession({
+      session_id: id,
+      verify_owner_user_id: user.id,
+    });
+
+    await deleteSession({ session_id: id });
+
+    return NextResponse.json({ deleted: true });
+  } catch (error) {
+    if (error instanceof Error && error.message === "Session not found") {
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
+    console.error("Session delete error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

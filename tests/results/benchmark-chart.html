@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Second Opinion AI — Benchmark Results</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      padding: 2rem;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+    .subtitle {
+      color: #64748b;
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+    .stats-row {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: white;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      min-width: 160px;
+      flex: 1;
+    }
+    .stat-card .label { font-size: 0.8rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-card .value { font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; }
+    .stat-card .value.pass { color: #10b981; }
+    .stat-card .value.fail { color: #ef4444; }
+    .stat-card .value.neutral { color: #3b82f6; }
+    .chart-card {
+      background: white;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .chart-container { position: relative; height: 360px; }
+    .metric-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      font-size: 0.875rem;
+    }
+    .metric-table th {
+      text-align: left;
+      padding: 0.625rem 1rem;
+      background: #f1f5f9;
+      font-weight: 600;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    .metric-table td {
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .metric-table tr:hover td { background: #f8fafc; }
+    .badge {
+      display: inline-block;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge.pass { background: #d1fae5; color: #065f46; }
+    .badge.fail { background: #fee2e2; color: #991b1b; }
+    .badge.none { background: #f1f5f9; color: #64748b; }
+    footer {
+      margin-top: 2rem;
+      text-align: center;
+      color: #94a3b8;
+      font-size: 0.8rem;
+    }
+    .rerun-hint {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #eff6ff;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: #1e40af;
+    }
+    .rerun-hint code {
+      background: #dbeafe;
+      padding: 0.125rem 0.375rem;
+      border-radius: 4px;
+      font-family: 'SF Mono', Menlo, monospace;
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Second Opinion AI — Benchmark Results</h1>
+    <p class="subtitle">
+      Model: claude-sonnet-4-5-20250929
+      &middot; 2/14/2026, 12:25:39 PM
+      &middot; 3 hard samples, 20 conversation evals
+    </p>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="label">Metrics Passing</div>
+        <div class="value pass">12 / 13</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Metrics Failing</div>
+        <div class="value fail">1</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Samples OK</div>
+        <div class="value neutral">3</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Samples Errored</div>
+        <div class="value pass">0</div>
+      </div>
+    </div>
+
+    
+    <div class="chart-card">
+      <div class="chart-container">
+        <canvas id="chart-0"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-container">
+        <canvas id="chart-1"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-container">
+        <canvas id="chart-2"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">All Metrics</h2>
+      <table class="metric-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Category</th>
+            <th>Score</th>
+            <th>Threshold</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+                <td><strong>Faithfulness</strong></td>
+                <td>Extraction Quality</td>
+                <td>88.3%</td>
+                <td>85%</td>
+                <td><span class="badge pass">PASS</span></td>
+              </tr>
+          <tr>
+                <td><strong>Completeness</strong></td>
+                <td>Extraction Quality</td>
+                <td>78.3%</td>
+                <td>75%</td>
+                <td><span class="badge pass">PASS</span></td>
+              </tr>
+          <tr>
+                <td><strong>Correctness</strong></td>
+                <td>Extraction Quality</td>
+                <td>81.7%</td>
+                <td>80%</td>
+                <td><span class="badge pass">PASS</span></td>
+              </tr>
+          <tr>
+                <td><strong>Consistency</strong></td>
+                <td>Extraction Quality</td>
+                <td>90.0%</td>
+                <td>—</td>
+                <td><span class="badge none">N/A</span></td>
+              </tr>
+          <tr>
+                <td><strong>Overall Confidence</strong></td>
+                <td>Extraction Quality</td>
+                <td>82.0%</td>
+                <td>—</td>
+                <td><span class="badge none">N/A</span></td>
+              </tr>
+          <tr>
+                <td><strong>Field Coverage</strong></td>
+                <td>Data Coverage</td>
+                <td>93.3%</td>
+                <td>80%</td>
+                <td><span class="badge pass">PASS</span></td>
+              </tr>
+          <tr>
+                <td><strong>ROUGE vs SOAP</strong></td>
+                <td>Data Coverage</td>
+                <td>34.9%</td>
+                <td>20%</td>
+                <td><span class="badge pass">PASS</span></td>
+              </tr>
+          <tr>
+                <td><strong>Thoroughness</strong></td>
+                <td>Conversation Quality</td>
+                <td>65.0%</td>
+                <td>—</td>
+                <td><span class="badge none">N/A</span></td>
+              </tr>
+          <tr>
+                <td><strong>Empathy</strong></td>
+                <td>Conversation Quality</td>
+                <td>58.3%</td>
+                <td>—</td>
+                <td><span class="badge none">N/A</span></td>
+              </tr>
+          <tr>
+                <td><strong>Safety</strong></td>
+                <td>Conversation Quality</td>
+                <td>53.3%</td>
+                <td>90%</td>
+                <td><span class="badge fail">FAIL</span></td>
+              </tr>
+          <tr>
+                <td><strong>Accuracy</strong></td>
+                <td>Conversation Quality</td>
+                <td>81.7%</td>
+                <td>—</td>
+                <td><span class="badge none">N/A</span></td>
+              </tr>
+          <tr>
+                <td><strong>Follow-up Quality</strong></td>
+                <td>Conversation Quality</td>
+                <td>48.3%</td>
+                <td>—</td>
+                <td><span class="badge none">N/A</span></td>
+              </tr>
+          <tr>
+                <td><strong>Overall Quality</strong></td>
+                <td>Conversation Quality</td>
+                <td>58.3%</td>
+                <td>—</td>
+                <td><span class="badge none">N/A</span></td>
+              </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rerun-hint">
+      <strong>Rerun benchmarks:</strong><br>
+      <code>npm run test:benchmark</code> — run with default model (Sonnet 4.5)<br>
+      <code>BENCHMARK_MODEL=claude-haiku-4-5-20251001 npm run test:benchmark</code> — run with a different model<br>
+      <code>BENCHMARK_SAMPLES=10 npm run test:benchmark</code> — quick run with fewer samples<br>
+      <code>npm run test:visualize</code> — regenerate this chart from latest results<br>
+      <code>npm run test:visualize -- --compare</code> — compare last 5 runs
+    </div>
+
+    <footer>
+      Generated 2/15/2026, 2:48:41 PM &middot; Second Opinion AI Benchmark Suite
+    </footer>
+  </div>
+
+  <script>
+    
+      new Chart(document.getElementById('chart-0'), {
+        type: 'bar',
+        data: {
+          labels: ["Faithfulness","Completeness","Correctness","Consistency","Overall Confidence"],
+          datasets: [{
+          label: "sonnet-4-5 (Feb 14, 12:25 PM)",
+          data: [0.8833,0.7833,0.8167,0.9000,0.8200],
+          backgroundColor: ['rgba(16, 185, 129, 0.75)','rgba(16, 185, 129, 0.75)','rgba(16, 185, 129, 0.75)','rgba(59, 130, 246, 0.75)','rgba(59, 130, 246, 0.75)'],
+          borderColor: ['rgb(16, 185, 129)','rgb(16, 185, 129)','rgb(16, 185, 129)','rgb(59, 130, 246)','rgb(59, 130, 246)'],
+          borderWidth: 1.5,
+          borderRadius: 4,
+        },{
+          label: 'Threshold',
+          data: [0.85,0.75,0.8,null,null],
+          type: 'line',
+          borderColor: 'rgba(239, 68, 68, 0.7)',
+          borderWidth: 2,
+          borderDash: [6, 4],
+          pointBackgroundColor: 'rgba(239, 68, 68, 0.9)',
+          pointRadius: 5,
+          pointStyle: 'crossRot',
+          fill: false,
+          order: 0,
+          spanGaps: true,
+        }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 1,
+              ticks: {
+                callback: v => (v * 100).toFixed(0) + '%',
+                font: { size: 12 },
+              },
+              grid: { color: 'rgba(0,0,0,0.06)' },
+            },
+            x: {
+              ticks: { font: { size: 12, weight: '500' } },
+              grid: { display: false },
+            }
+          },
+          plugins: {
+            legend: { display: true, position: 'top' },
+            title: {
+              display: true,
+              text: 'Extraction Quality',
+              font: { size: 18, weight: '600' },
+              padding: { bottom: 16 },
+            },
+            tooltip: {
+              callbacks: {
+                label: ctx => ctx.dataset.label + ': ' + (ctx.raw * 100).toFixed(1) + '%',
+              }
+            },
+          },
+        }
+      });
+    
+
+      new Chart(document.getElementById('chart-1'), {
+        type: 'bar',
+        data: {
+          labels: ["Field Coverage","ROUGE vs SOAP"],
+          datasets: [{
+          label: "sonnet-4-5 (Feb 14, 12:25 PM)",
+          data: [0.9333,0.3493],
+          backgroundColor: ['rgba(16, 185, 129, 0.75)','rgba(16, 185, 129, 0.75)'],
+          borderColor: ['rgb(16, 185, 129)','rgb(16, 185, 129)'],
+          borderWidth: 1.5,
+          borderRadius: 4,
+        },{
+          label: 'Threshold',
+          data: [0.8,0.2],
+          type: 'line',
+          borderColor: 'rgba(239, 68, 68, 0.7)',
+          borderWidth: 2,
+          borderDash: [6, 4],
+          pointBackgroundColor: 'rgba(239, 68, 68, 0.9)',
+          pointRadius: 5,
+          pointStyle: 'crossRot',
+          fill: false,
+          order: 0,
+          spanGaps: true,
+        }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 1,
+              ticks: {
+                callback: v => (v * 100).toFixed(0) + '%',
+                font: { size: 12 },
+              },
+              grid: { color: 'rgba(0,0,0,0.06)' },
+            },
+            x: {
+              ticks: { font: { size: 12, weight: '500' } },
+              grid: { display: false },
+            }
+          },
+          plugins: {
+            legend: { display: true, position: 'top' },
+            title: {
+              display: true,
+              text: 'Data Coverage',
+              font: { size: 18, weight: '600' },
+              padding: { bottom: 16 },
+            },
+            tooltip: {
+              callbacks: {
+                label: ctx => ctx.dataset.label + ': ' + (ctx.raw * 100).toFixed(1) + '%',
+              }
+            },
+          },
+        }
+      });
+    
+
+      new Chart(document.getElementById('chart-2'), {
+        type: 'bar',
+        data: {
+          labels: ["Thoroughness","Empathy","Safety","Accuracy","Follow-up Quality","Overall Quality"],
+          datasets: [{
+          label: "sonnet-4-5 (Feb 14, 12:25 PM)",
+          data: [0.6500,0.5833,0.5333,0.8167,0.4833,0.5833],
+          backgroundColor: ['rgba(16, 185, 129, 0.75)','rgba(16, 185, 129, 0.75)','rgba(239, 68, 68, 0.75)','rgba(16, 185, 129, 0.75)','rgba(16, 185, 129, 0.75)','rgba(16, 185, 129, 0.75)'],
+          borderColor: ['rgb(16, 185, 129)','rgb(16, 185, 129)','rgb(239, 68, 68)','rgb(16, 185, 129)','rgb(16, 185, 129)','rgb(16, 185, 129)'],
+          borderWidth: 1.5,
+          borderRadius: 4,
+        },{
+          label: 'Threshold',
+          data: [null,null,0.9,null,null,null],
+          type: 'line',
+          borderColor: 'rgba(239, 68, 68, 0.7)',
+          borderWidth: 2,
+          borderDash: [6, 4],
+          pointBackgroundColor: 'rgba(239, 68, 68, 0.9)',
+          pointRadius: 5,
+          pointStyle: 'crossRot',
+          fill: false,
+          order: 0,
+          spanGaps: true,
+        }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 1,
+              ticks: {
+                callback: v => (v * 100).toFixed(0) + '%',
+                font: { size: 12 },
+              },
+              grid: { color: 'rgba(0,0,0,0.06)' },
+            },
+            x: {
+              ticks: { font: { size: 12, weight: '500' } },
+              grid: { display: false },
+            }
+          },
+          plugins: {
+            legend: { display: true, position: 'top' },
+            title: {
+              display: true,
+              text: 'Conversation Quality',
+              font: { size: 18, weight: '600' },
+              padding: { bottom: 16 },
+            },
+            tooltip: {
+              callbacks: {
+                label: ctx => ctx.dataset.label + ': ' + (ctx.raw * 100).toFixed(1) + '%',
+              }
+            },
+          },
+        }
+      });
+    
+  </script>
+</body>
+</html>

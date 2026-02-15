@@ -67,13 +67,13 @@ wss.on("connection", async (ws, req) => {
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
-  const { data: session } = await serviceClient
+  const { data: session, error: sessionError } = await serviceClient
     .from("sessions")
     .select("*, patients!inner(id, user_id)")
     .eq("id", sessionId)
     .single();
 
-  if (!session || session.patients.user_id !== user.id) {
+  if (sessionError || !session || session.patients?.user_id !== user.id) {
     ws.send(JSON.stringify({ type: "error", text: "Session not found" }));
     ws.close(1008, "Session not found");
     return;
@@ -84,8 +84,8 @@ wss.on("connection", async (ws, req) => {
   // Create session manager
   const manager = new SessionManager(ws, sessionId, session.patients.id);
 
-  // Initialize (loads EHR, sends greeting)
-  manager.initialize();
+  // Initialize (loads EHR, sends greeting) — await so errors are caught
+  await manager.initialize();
 
   ws.on("message", async (data, isBinary) => {
     try {
@@ -99,10 +99,14 @@ wss.on("connection", async (ws, req) => {
 
         switch (message.type) {
           case "text":
-            await manager.handleTextMessage(message.text);
+            if (typeof message.text === "string") {
+              await manager.handleTextMessage(message.text);
+            }
             break;
           case "language":
-            manager.setLanguage(message.language);
+            if (typeof message.language === "string") {
+              manager.setLanguage(message.language);
+            }
             break;
           case "end":
             await manager.endSession();
@@ -114,18 +118,24 @@ wss.on("connection", async (ws, req) => {
       }
     } catch (error) {
       console.error("Message handling error:", error);
-      ws.send(
-        JSON.stringify({
-          type: "error",
-          text: "Failed to process message",
-        })
-      );
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(
+          JSON.stringify({
+            type: "error",
+            text: "Failed to process message",
+          })
+        );
+      }
     }
   });
 
   ws.on("close", async () => {
     console.log(`Client disconnected: session=${sessionId}`);
-    await manager.endSession();
+    try {
+      await manager.endSession();
+    } catch (error) {
+      console.error("Error during disconnect cleanup:", error);
+    }
   });
 
   ws.on("error", (error) => {

@@ -30,4 +30,5 @@ export interface WSMessage {
   audio?: string; // base64 encoded
   language?: string;
   sessionId?: string;
+  role?: 'user' | 'assistant';
 }

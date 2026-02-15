@@ -32,8 +32,8 @@ export function PushToTalkButton({
           isRecording
             ? "bg-red-500 scale-110 shadow-lg shadow-red-200"
             : disabled
-            ? "bg-gray-300 cursor-not-allowed"
-            : "bg-blue-600 hover:bg-blue-700 active:scale-95 shadow-md"
+            ? "bg-muted cursor-not-allowed"
+            : "bg-primary hover:bg-primary/90 active:scale-95 shadow-md shadow-primary/20"
         }
       `}
     >

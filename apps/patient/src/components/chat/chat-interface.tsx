@@ -85,7 +85,8 @@ export function ChatInterface({ sessionId, mode, existingMessages }: ChatInterfa
     // Trigger post-session pipeline (don't await - runs in background)
     fetch(`/api/session/${sessionId}/complete`, { method: "POST" }).catch(() => {});
 
-    router.push("/dashboard/consultation");
+    // Navigate to session detail page to show summary + visit record
+    router.push(`/dashboard/session/${sessionId}`);
     router.refresh();
   };
 
@@ -117,7 +118,7 @@ export function ChatInterface({ sessionId, mode, existingMessages }: ChatInterfa
           <h2 className="text-xl font-bold">
             {mode === "voice" ? "Voice" : "Text"} Consultation
           </h2>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-muted-foreground">
             Session with Dr. AI
           </p>
         </div>
@@ -138,8 +139,8 @@ export function ChatInterface({ sessionId, mode, existingMessages }: ChatInterfa
 
           {isLoading && messages[messages.length - 1]?.role === "user" && (
             <div className="flex justify-start">
-              <div className="bg-gray-100 rounded-lg px-4 py-2 text-sm">
-                <div className="flex items-center gap-1">
+              <div className="bg-muted rounded-lg px-4 py-2 text-sm">
+                <div className="flex items-center gap-1 text-muted-foreground">
                   <span className="animate-bounce">.</span>
                   <span className="animate-bounce" style={{ animationDelay: "0.1s" }}>.</span>
                   <span className="animate-bounce" style={{ animationDelay: "0.2s" }}>.</span>

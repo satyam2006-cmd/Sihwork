@@ -3,9 +3,12 @@ import { VisitExtractionSchema, type VisitExtraction } from '../schemas/visit-ex
 import { VISIT_EXTRACTION_SYSTEM_PROMPT } from '../prompts/visit-extraction-prompt';
 import type { ChatMessage } from '../types/index';
 
+const DEFAULT_MODEL = 'claude-sonnet-4-5-20250929';
+
 export async function extractVisitData(
   transcript: ChatMessage[],
-  ehrContext?: string
+  ehrContext?: string,
+  model?: string,
 ): Promise<VisitExtraction> {
   const client = getAnthropicClient();
 
@@ -18,7 +21,7 @@ export async function extractVisitData(
     : `=== TODAY'S CONSULTATION TRANSCRIPT ===\n${transcriptText}`;
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-5-20250929',
+    model: model || DEFAULT_MODEL,
     max_tokens: 4096,
     system: VISIT_EXTRACTION_SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userContent }],

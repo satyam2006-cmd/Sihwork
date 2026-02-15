@@ -26,6 +26,8 @@ export async function processUtterance(
     detectedLanguage = asrResult.language_code || preferredLanguage || "en";
   } catch (error) {
     console.error("ASR failed:", error);
+    // Propagate the specific error from Sarvam (rate limit, timeout, etc.)
+    if (error instanceof Error) throw error;
     throw new Error("Speech recognition failed. Please try again.");
   }
 

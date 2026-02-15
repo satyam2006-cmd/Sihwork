@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +47,9 @@ function formatDate(dateStr: string): string {
   });
 }
 
+const POLL_INTERVAL_MS = 3_000;
+const MAX_POLL_DURATION_MS = 120_000;
+
 export default function SessionPage() {
   const params = useParams();
   const sessionId = params.id as string;
@@ -54,23 +57,63 @@ export default function SessionPage() {
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [visitRecord, setVisitRecord] = useState<VisitRecordData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const pollStartRef = useRef<number>(0);
 
-  useEffect(() => {
-    const fetchSession = async () => {
-      try {
-        const res = await fetch(`/api/session/${sessionId}`);
-        const data = await res.json();
-        setSession(data.session);
-        setSummary(data.summary);
-        setVisitRecord(data.visit_record);
-      } catch {
-        console.error("Failed to load session");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchSession();
+  const fetchSession = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/session/${sessionId}`);
+      const data = await res.json();
+      setSession(data.session);
+      setSummary(data.summary ?? null);
+      setVisitRecord(data.visit_record ?? null);
+      return data;
+    } catch {
+      console.error("Failed to load session");
+      return null;
+    }
   }, [sessionId]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchSession().then(() => setLoading(false));
+  }, [fetchSession]);
+
+  // Poll for summary/visit record when session is completed but they're not ready yet
+  useEffect(() => {
+    const isCompleted = session && session.status === "completed";
+    const needsData = !summary && !visitRecord;
+
+    if (!isCompleted || !needsData) {
+      setGenerating(false);
+      return;
+    }
+
+    setGenerating(true);
+    pollStartRef.current = Date.now();
+
+    const interval = setInterval(async () => {
+      if (Date.now() - pollStartRef.current > MAX_POLL_DURATION_MS) {
+        setGenerating(false);
+        clearInterval(interval);
+        return;
+      }
+
+      const data = await fetchSession();
+      if (data?.summary || data?.visit_record) {
+        setGenerating(false);
+        clearInterval(interval);
+      }
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [session?.status, summary, visitRecord, fetchSession]);
+
+  // Called when voice console ends — refetch session to show completed view
+  const handleVoiceEnd = useCallback(() => {
+    setLoading(true);
+    fetchSession().then(() => setLoading(false));
+  }, [fetchSession]);
 
   if (loading) {
     return (
@@ -82,7 +125,7 @@ export default function SessionPage() {
   }
 
   if (!session) {
-    return <p className="text-gray-500">Session not found</p>;
+    return <p className="text-muted-foreground">Session not found</p>;
   }
 
   // If session is active, show appropriate interface
@@ -91,9 +134,7 @@ export default function SessionPage() {
       return (
         <VoiceConsole
           sessionId={sessionId}
-          onEnd={() => {
-            window.location.reload();
-          }}
+          onEnd={handleVoiceEnd}
         />
       );
     }
@@ -112,7 +153,7 @@ export default function SessionPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Session Details</h2>
-          <p className="text-gray-500">{formatDate(session.started_at)}</p>
+          <p className="text-muted-foreground">{formatDate(session.started_at)}</p>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant={session.emergency_flagged ? "destructive" : "secondary"}>
@@ -121,6 +162,23 @@ export default function SessionPage() {
           <Badge variant="outline">{session.mode}</Badge>
         </div>
       </div>
+
+      {/* Generating indicator */}
+      {generating && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <div>
+                <p className="font-medium text-sm">Generating your visit summary and record...</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  This usually takes 15–30 seconds.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary */}
       {summary && (
@@ -172,14 +230,14 @@ export default function SessionPage() {
           <CardContent className="space-y-4">
             {visitRecord.chief_complaint && (
               <div>
-                <h4 className="text-sm font-medium text-gray-700">Chief Complaint</h4>
+                <h4 className="text-sm font-medium text-foreground/70">Chief Complaint</h4>
                 <p className="text-sm">{visitRecord.chief_complaint}</p>
               </div>
             )}
 
             {visitRecord.symptoms && visitRecord.symptoms.length > 0 && (
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Symptoms</h4>
+                <h4 className="text-sm font-medium text-foreground/70 mb-2">Symptoms</h4>
                 <div className="flex flex-wrap gap-2">
                   {visitRecord.symptoms.map((s, i) => (
                     <Badge key={i} variant="outline">
@@ -194,14 +252,14 @@ export default function SessionPage() {
 
             {visitRecord.assessment && (
               <div>
-                <h4 className="text-sm font-medium text-gray-700">Assessment</h4>
+                <h4 className="text-sm font-medium text-foreground/70">Assessment</h4>
                 <p className="text-sm">{visitRecord.assessment}</p>
               </div>
             )}
 
             {visitRecord.diagnoses && visitRecord.diagnoses.length > 0 && (
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Diagnoses</h4>
+                <h4 className="text-sm font-medium text-foreground/70 mb-2">Diagnoses</h4>
                 <div className="space-y-1">
                   {visitRecord.diagnoses.map((dx, i) => (
                     <div key={i} className="flex items-center gap-2 text-sm">
@@ -219,7 +277,7 @@ export default function SessionPage() {
 
             {visitRecord.recommendations && visitRecord.recommendations.length > 0 && (
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Recommendations</h4>
+                <h4 className="text-sm font-medium text-foreground/70 mb-2">Recommendations</h4>
                 <div className="space-y-2">
                   {visitRecord.recommendations.map((rec, i) => (
                     <div key={i} className="flex items-start gap-2 text-sm">
@@ -242,7 +300,7 @@ export default function SessionPage() {
 
             {visitRecord.follow_up && (
               <div>
-                <h4 className="text-sm font-medium text-gray-700">Follow-up Plan</h4>
+                <h4 className="text-sm font-medium text-foreground/70">Follow-up Plan</h4>
                 <p className="text-sm">{visitRecord.follow_up}</p>
               </div>
             )}
@@ -260,7 +318,7 @@ export default function SessionPage() {
 
             {visitRecord.medication_changes && visitRecord.medication_changes.length > 0 && (
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Medication Changes</h4>
+                <h4 className="text-sm font-medium text-foreground/70 mb-2">Medication Changes</h4>
                 <div className="space-y-1">
                   {visitRecord.medication_changes.map((mc, i) => (
                     <div key={i} className="text-sm">
@@ -295,8 +353,8 @@ export default function SessionPage() {
                   <div
                     className={`max-w-[80%] rounded-lg px-4 py-2 text-sm ${
                       msg.role === "user"
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-100"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-foreground"
                     }`}
                   >
                     {msg.content}

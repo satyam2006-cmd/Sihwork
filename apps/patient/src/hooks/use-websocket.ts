@@ -1,36 +1,50 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { createClient } from "@/lib/supabase";
+import { getAccessTokenFromCookie } from "@/lib/supabase";
 import type { WSMessage } from "@second-opinion/shared";
 
-type ConnectionState = "disconnected" | "connecting" | "connected" | "error";
+type ConnectionState = "disconnected" | "connecting" | "connected" | "error" | "timeout";
 
 export function useWebSocket(sessionId: string | null) {
   const wsRef = useRef<WebSocket | null>(null);
   const [connectionState, setConnectionState] = useState<ConnectionState>("disconnected");
   const [lastMessage, setLastMessage] = useState<WSMessage | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryCountRef = useRef(0);
+  const maxRetries = 2;
 
   const connect = useCallback(async () => {
     if (!sessionId) return;
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    if (wsRef.current?.readyState === WebSocket.OPEN ||
+        wsRef.current?.readyState === WebSocket.CONNECTING) return;
 
     setConnectionState("connecting");
 
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
+      const accessToken = getAccessTokenFromCookie();
+      if (!accessToken) {
         setConnectionState("error");
         return;
       }
 
       const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3001";
-      const url = `${wsUrl}?token=${session.access_token}&sessionId=${sessionId}`;
+      const url = `${wsUrl}?token=${accessToken}&sessionId=${sessionId}`;
 
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
+      // Connection timeout - if not connected within 10s, give up
+      connectTimeoutRef.current = setTimeout(() => {
+        if (ws.readyState !== WebSocket.OPEN) {
+          ws.close();
+          wsRef.current = null;
+          setConnectionState("timeout");
+        }
+      }, 10000);
+
       ws.onopen = () => {
+        if (connectTimeoutRef.current) clearTimeout(connectTimeoutRef.current);
+        retryCountRef.current = 0;
         setConnectionState("connected");
       };
 
@@ -44,19 +58,31 @@ export function useWebSocket(sessionId: string | null) {
       };
 
       ws.onclose = (event) => {
-        setConnectionState("disconnected");
+        if (connectTimeoutRef.current) clearTimeout(connectTimeoutRef.current);
         wsRef.current = null;
 
-        // Auto-reconnect unless intentionally closed
-        if (event.code !== 1000 && event.code !== 1008) {
-          reconnectTimeoutRef.current = setTimeout(() => {
-            connect();
-          }, 3000);
+        if (event.code === 1000) {
+          // Normal close (user disconnected or session ended gracefully)
+          setConnectionState("disconnected");
+        } else if (event.code === 1008) {
+          // Policy violation — auth failed or session not found
+          setConnectionState("error");
+        } else {
+          // Unexpected close — auto-reconnect with retry limit
+          if (retryCountRef.current < maxRetries) {
+            retryCountRef.current++;
+            setConnectionState("connecting");
+            reconnectTimeoutRef.current = setTimeout(() => {
+              connect();
+            }, 3000);
+          } else {
+            setConnectionState("timeout");
+          }
         }
       };
 
       ws.onerror = () => {
-        setConnectionState("error");
+        // onerror is always followed by onclose, so let onclose handle state
       };
     } catch (error) {
       console.error("WebSocket connection error:", error);
@@ -67,18 +93,26 @@ export function useWebSocket(sessionId: string | null) {
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    if (connectTimeoutRef.current) {
+      clearTimeout(connectTimeoutRef.current);
+      connectTimeoutRef.current = null;
     }
     if (wsRef.current) {
       wsRef.current.close(1000, "User disconnected");
       wsRef.current = null;
     }
+    retryCountRef.current = 0;
     setConnectionState("disconnected");
   }, []);
 
-  const sendAudio = useCallback((audioBuffer: ArrayBuffer) => {
+  const sendAudio = useCallback((audioBuffer: ArrayBuffer): boolean => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(audioBuffer);
+      return true;
     }
+    return false;
   }, []);
 
   const sendText = useCallback((text: string) => {
