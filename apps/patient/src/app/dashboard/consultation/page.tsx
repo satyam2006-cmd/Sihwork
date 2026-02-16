@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +23,7 @@ export default function ConsultationPage() {
   useEffect(() => {
     const fetchActiveSessions = async () => {
       try {
-        const res = await fetch("/api/session");
+        const res = await apiFetch("/api/session");
         const data = await res.json();
         const active = (data.sessions || []).filter(
           (s: { status: string }) => s.status === "active"
@@ -38,7 +39,7 @@ export default function ConsultationPage() {
   const startSession = async (mode: "text" | "voice") => {
     setStarting(true);
     try {
-      const res = await fetch("/api/session", {
+      const res = await apiFetch("/api/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode }),

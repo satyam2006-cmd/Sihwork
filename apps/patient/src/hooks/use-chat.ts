@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import { apiFetch } from "@/lib/utils";
 
 export interface Message {
   id: string;
@@ -28,7 +29,7 @@ export function useChat(sessionId: string) {
   const getGreeting = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/chat", {
+      const res = await apiFetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId }),
@@ -58,7 +59,7 @@ export function useChat(sessionId: string) {
       abortControllerRef.current = controller;
 
       try {
-        const res = await fetch("/api/chat", {
+        const res = await apiFetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId, message: content }),
@@ -129,7 +130,7 @@ export function useChat(sessionId: string) {
 
   const endSession = useCallback(async () => {
     try {
-      await fetch(`/api/session/${sessionId}`, {
+      await apiFetch(`/api/session/${sessionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

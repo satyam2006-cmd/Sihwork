@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
+import { apiFetch } from "@/lib/utils";
 
 interface DashboardStats {
   totalPatients: number;
@@ -25,8 +26,8 @@ export default function DashboardPage() {
     const fetchStats = async () => {
       try {
         const [patientsRes, sessionsRes] = await Promise.all([
-          fetch("/api/patients"),
-          fetch("/api/sessions"),
+          apiFetch("/api/patients"),
+          apiFetch("/api/sessions"),
         ]);
 
         const patients = patientsRes.ok ? await patientsRes.json() : [];

@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { apiFetch } from "@/lib/utils";
 
 interface Session {
   id: string;
@@ -31,7 +32,7 @@ export default function SessionsPage() {
   useEffect(() => {
     const fetchSessions = async () => {
       try {
-        const res = await fetch("/api/sessions");
+        const res = await apiFetch("/api/sessions");
         if (res.ok) {
           const data = await res.json();
           setSessions(data);

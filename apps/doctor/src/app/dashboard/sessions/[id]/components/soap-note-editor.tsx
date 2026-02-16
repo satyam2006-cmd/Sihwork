@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/utils";
 
 interface SOAPNote {
   id: string;
@@ -52,7 +53,7 @@ export function SOAPNoteEditor({
   const saveField = async (field: string) => {
     setSaving(true);
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/soap-note`, {
+      const res = await apiFetch(`/api/sessions/${sessionId}/soap-note`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -78,7 +79,7 @@ export function SOAPNoteEditor({
   const handleFinalize = async () => {
     setFinalizing(true);
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/soap-note`, {
+      const res = await apiFetch(`/api/sessions/${sessionId}/soap-note`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

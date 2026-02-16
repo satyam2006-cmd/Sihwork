@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { GenerateLetterDialog } from "./generate-letter-dialog";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/utils";
 
 interface ClinicalLetter {
   id: string;
@@ -67,7 +68,7 @@ export function ClinicalLettersPanel({
   const saveBody = async (letterId: string) => {
     setSaving(true);
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/letters`, {
+      const res = await apiFetch(`/api/sessions/${sessionId}/letters`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -96,7 +97,7 @@ export function ClinicalLettersPanel({
 
   const finalizeLetter = async (letterId: string) => {
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/letters`, {
+      const res = await apiFetch(`/api/sessions/${sessionId}/letters`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

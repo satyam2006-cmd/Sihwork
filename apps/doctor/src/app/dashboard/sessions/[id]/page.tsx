@@ -11,6 +11,7 @@ import { SOAPNoteEditor } from "./components/soap-note-editor";
 import { EHREntryEditor } from "./components/ehr-entry-editor";
 import { ClinicalLettersPanel } from "./components/clinical-letters-panel";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/utils";
 
 interface TranscriptMessage {
   role: string;
@@ -131,7 +132,7 @@ export default function SessionDetailPage({
 
   const fetchSession = useCallback(async () => {
     try {
-      const res = await fetch(`/api/sessions/${id}`);
+      const res = await apiFetch(`/api/sessions/${id}`);
       if (!res.ok) {
         setError("Session not found");
         return;
@@ -153,7 +154,7 @@ export default function SessionDetailPage({
     if (!session) return;
     setMarking(true);
     try {
-      const res = await fetch(`/api/sessions/${id}`, {
+      const res = await apiFetch(`/api/sessions/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reviewed: true }),

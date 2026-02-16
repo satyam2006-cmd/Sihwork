@@ -8,11 +8,11 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/doctor/:path*",
-        destination: `${doctorUrl}/:path*`,
+        destination: `${doctorUrl}/doctor/:path*`,
       },
       {
         source: "/patient/:path*",
-        destination: `${patientUrl}/:path*`,
+        destination: `${patientUrl}/patient/:path*`,
       },
     ];
   },

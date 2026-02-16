@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/utils";
 
 interface DiagnosisICD {
   code?: string;
@@ -75,7 +76,7 @@ export function EHREntryEditor({
   const saveField = async (field: string) => {
     setSaving(true);
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/ehr-entry`, {
+      const res = await apiFetch(`/api/sessions/${sessionId}/ehr-entry`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -101,7 +102,7 @@ export function EHREntryEditor({
   const handleFinalize = async () => {
     setFinalizing(true);
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/ehr-entry`, {
+      const res = await apiFetch(`/api/sessions/${sessionId}/ehr-entry`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

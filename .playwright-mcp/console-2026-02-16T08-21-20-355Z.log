@@ -1,0 +1,15 @@
+[     156ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3003/favicon.ico:0
+[    7069ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3003/api/sessions:0
+[    7070ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3003/api/patients:0
+[    7093ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3003/api/sessions:0
+[    7095ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3003/api/patients:0
+[   57907ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3003/api/patients:0
+[   57910ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3003/api/sessions:0
+[   57937ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3003/api/patients:0
+[   57943ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3003/api/sessions:0
+[  155860ms] [ERROR] WebSocket connection to 'ws://localhost:3003/doctor/_next/webpack-hmr?id=LKEwrvTDOlzTqeQ2Y0Oiq' failed:  @ http://localhost:3003/doctor/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[  156863ms] [ERROR] WebSocket connection to 'ws://localhost:3003/doctor/_next/webpack-hmr?id=LKEwrvTDOlzTqeQ2Y0Oiq' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3003/doctor/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[  157867ms] [ERROR] WebSocket connection to 'ws://localhost:3003/doctor/_next/webpack-hmr?id=LKEwrvTDOlzTqeQ2Y0Oiq' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3003/doctor/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[  158869ms] [ERROR] WebSocket connection to 'ws://localhost:3003/doctor/_next/webpack-hmr?id=LKEwrvTDOlzTqeQ2Y0Oiq' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3003/doctor/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[  159872ms] [ERROR] WebSocket connection to 'ws://localhost:3003/doctor/_next/webpack-hmr?id=LKEwrvTDOlzTqeQ2Y0Oiq' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3003/doctor/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878
+[  160875ms] [ERROR] WebSocket connection to 'ws://localhost:3003/doctor/_next/webpack-hmr?id=LKEwrvTDOlzTqeQ2Y0Oiq' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://localhost:3003/doctor/_next/static/chunks/node_modules_next_dist_client_17643121._.js:10878

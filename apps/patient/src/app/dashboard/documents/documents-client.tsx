@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,7 +57,7 @@ export function DocumentsClient({ initialDocuments }: { initialDocuments: Docume
 
   const handleViewPdf = async (doc: DocumentRecord) => {
     try {
-      const res = await fetch(`/api/documents/${doc.id}/download`);
+      const res = await apiFetch(`/api/documents/${doc.id}/download`);
       const data = await res.json();
       if (data.url) {
         window.open(data.url, "_blank");
@@ -71,7 +72,7 @@ export function DocumentsClient({ initialDocuments }: { initialDocuments: Docume
   const handleDelete = async (doc: DocumentRecord) => {
     setDeleting(true);
     try {
-      const res = await fetch(`/api/documents/${doc.id}`, { method: "DELETE" });
+      const res = await apiFetch(`/api/documents/${doc.id}`, { method: "DELETE" });
       if (!res.ok) {
         toast.error("Failed to delete document");
       } else {
@@ -101,7 +102,7 @@ export function DocumentsClient({ initialDocuments }: { initialDocuments: Docume
     formData.append("file", file);
 
     try {
-      const res = await fetch("/api/documents/upload", {
+      const res = await apiFetch("/api/documents/upload", {
         method: "POST",
         body: formData,
       });
@@ -126,7 +127,7 @@ export function DocumentsClient({ initialDocuments }: { initialDocuments: Docume
   const handleExtract = async (documentId: string) => {
     setExtracting(documentId);
     try {
-      const res = await fetch("/api/documents/extract", {
+      const res = await apiFetch("/api/documents/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ documentId }),

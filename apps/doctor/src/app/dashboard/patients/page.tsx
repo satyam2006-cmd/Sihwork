@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { apiFetch } from "@/lib/utils";
 
 interface Patient {
   id: string;
@@ -29,7 +30,7 @@ export default function PatientsPage() {
   useEffect(() => {
     const fetchPatients = async () => {
       try {
-        const res = await fetch("/api/patients");
+        const res = await apiFetch("/api/patients");
         if (res.ok) {
           const data = await res.json();
           setPatients(data);

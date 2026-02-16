@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { apiFetch } from "@/lib/utils";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { useVoice } from "@/hooks/use-voice";
 import { PushToTalkButton } from "./push-to-talk-button";
@@ -248,7 +249,7 @@ export function VoiceConsole({ sessionId, onEnd }: VoiceConsoleProps) {
     // Trigger post-session pipeline (generates visit record + summary).
     // This also marks the session as completed, so the page won't reload
     // into the active voice console again.
-    fetch(`/api/session/${sessionId}/complete`, { method: "POST" }).catch(() => {});
+    apiFetch(`/api/session/${sessionId}/complete`, { method: "POST" }).catch(() => {});
     onEnd();
   };
 

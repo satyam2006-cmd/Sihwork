@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/utils";
 import { useChat, type Message } from "@/hooks/use-chat";
 import { MessageBubble } from "./message-bubble";
 import { EmergencyAlert } from "./emergency-alert";
@@ -83,7 +84,7 @@ export function ChatInterface({ sessionId, mode, existingMessages }: ChatInterfa
     toast.success("Session ended. Processing your consultation...");
 
     // Trigger post-session pipeline (don't await - runs in background)
-    fetch(`/api/session/${sessionId}/complete`, { method: "POST" }).catch(() => {});
+    apiFetch(`/api/session/${sessionId}/complete`, { method: "POST" }).catch(() => {});
 
     // Navigate to session detail page to show summary + visit record
     router.push(`/dashboard/session/${sessionId}`);

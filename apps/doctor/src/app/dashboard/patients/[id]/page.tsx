@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiFetch } from "@/lib/utils";
 
 interface PatientDetail {
   id: string;
@@ -55,7 +56,7 @@ export default function PatientDetailPage({
   useEffect(() => {
     const fetchPatient = async () => {
       try {
-        const res = await fetch(`/api/patients/${id}`);
+        const res = await apiFetch(`/api/patients/${id}`);
         if (!res.ok) {
           setError("Patient not found");
           return;

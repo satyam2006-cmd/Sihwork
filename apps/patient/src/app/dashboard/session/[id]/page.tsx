@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
+import { apiFetch } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -62,7 +63,7 @@ export default function SessionPage() {
 
   const fetchSession = useCallback(async () => {
     try {
-      const res = await fetch(`/api/session/${sessionId}`);
+      const res = await apiFetch(`/api/session/${sessionId}`);
       const data = await res.json();
       setSession(data.session);
       setSummary(data.summary ?? null);
