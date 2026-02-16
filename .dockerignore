@@ -1,0 +1,155 @@
+# flyctl launch added from .gitignore
+# Environment variables
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Python
+**/__pycache__
+**/*.py[cod]
+**/*$py.class
+**/*.so
+**/.Python
+**/build
+**/develop-eggs
+**/dist
+**/downloads
+**/eggs
+**/.eggs
+**/lib
+**/lib64
+**/parts
+**/sdist
+**/var
+**/wheels
+**/*.egg-info
+**/.installed.cfg
+**/*.egg
+
+# Virtual environments
+**/venv
+**/ENV
+**/env
+**/.venv
+
+# IDE
+**/.vscode
+**/.idea
+**/*.swp
+**/*.swo
+**/*~
+
+# OS
+**/.DS_Store
+**/Thumbs.db
+
+# Jupyter Notebook
+**/.ipynb_checkpoints
+
+# Node
+**/node_modules
+**/.next
+**/out
+**/*.tsbuildinfo
+
+# Testing
+**/.pytest_cache
+**/.coverage
+**/htmlcov
+
+# flyctl launch added from apps/doctor/.gitignore
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+apps/doctor/node_modules
+apps/doctor/.pnp
+apps/doctor/**/.pnp.*
+apps/doctor/**/.yarn/*
+!apps/doctor/**/.yarn/patches
+!apps/doctor/**/.yarn/plugins
+!apps/doctor/**/.yarn/releases
+!apps/doctor/**/.yarn/versions
+
+# testing
+apps/doctor/coverage
+
+# next.js
+apps/doctor/.next
+apps/doctor/out
+
+# production
+apps/doctor/build
+
+# misc
+apps/doctor/**/.DS_Store
+apps/doctor/**/*.pem
+
+# debug
+apps/doctor/**/npm-debug.log*
+apps/doctor/**/yarn-debug.log*
+apps/doctor/**/yarn-error.log*
+apps/doctor/**/.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+apps/doctor/**/.env*
+
+# vercel
+apps/doctor/**/.vercel
+
+# typescript
+apps/doctor/**/*.tsbuildinfo
+apps/doctor/**/next-env.d.ts
+
+# flyctl launch added from apps/patient/.gitignore
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+apps/patient/node_modules
+apps/patient/.pnp
+apps/patient/**/.pnp.*
+apps/patient/**/.yarn/*
+!apps/patient/**/.yarn/patches
+!apps/patient/**/.yarn/plugins
+!apps/patient/**/.yarn/releases
+!apps/patient/**/.yarn/versions
+
+# testing
+apps/patient/coverage
+
+# next.js
+apps/patient/.next
+apps/patient/out
+
+# production
+apps/patient/build
+
+# misc
+apps/patient/**/.DS_Store
+apps/patient/**/*.pem
+
+# debug
+apps/patient/**/npm-debug.log*
+apps/patient/**/yarn-debug.log*
+apps/patient/**/yarn-error.log*
+apps/patient/**/.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+apps/patient/**/.env*
+
+# vercel
+apps/patient/**/.vercel
+
+# typescript
+apps/patient/**/*.tsbuildinfo
+apps/patient/**/next-env.d.ts
+
+# flyctl launch added from supabase/.gitignore
+# Supabase
+supabase/**/.branches
+supabase/**/.temp
+
+# dotenvx
+supabase/**/.env.keys
+supabase/**/.env.local
+supabase/**/.env.*.local
+fly.toml
