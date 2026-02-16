@@ -14,5 +14,17 @@ export { writeVisitRecord, writeVisitRecordDefinition } from './write-visit-reco
 export { writeSessionSummary, writeSessionSummaryDefinition } from './write-session-summary';
 export { reviewVisitRecord, reviewVisitRecordDefinition } from './review-visit-record';
 
+// SOAP Notes
+export { writeSOAPNote, writeSOAPNoteDefinition } from './write-soap-note';
+export { updateSOAPNote, updateSOAPNoteDefinition } from './update-soap-note';
+
+// EHR Entries
+export { writeEHREntry, writeEHREntryDefinition } from './write-ehr-entry';
+export { updateEHREntry, updateEHREntryDefinition } from './update-ehr-entry';
+
+// Clinical Letters
+export { writeClinicalLetter, writeClinicalLetterDefinition } from './write-clinical-letter';
+export { updateClinicalLetter, updateClinicalLetterDefinition } from './update-clinical-letter';
+
 // Documents
 export { manageDocument, manageDocumentDefinition } from './manage-document';

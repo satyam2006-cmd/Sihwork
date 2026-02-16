@@ -19,6 +19,10 @@ export { DocumentExtractionSchema, LabResultSchema, MedicationSchema, DiagnosisS
 export { VisitExtractionSchema, SymptomSchema, VitalsSchema, RecommendationSchema } from './schemas/visit-extraction';
 export { ExtractionEvalSchema, ConversationEvalSchema } from './schemas/eval-schemas';
 export { PatientSchema, DocumentSchema, SessionSchema } from './schemas/database';
+export {
+  SOAPNoteSchema, EHREntrySchema, ClinicalLetterSchema,
+  DiagnosisICDSchema, ProcedureCPTSchema, OrderSchema, PrescriptionSchema, ReviewOfSystemsSchema,
+} from './schemas/clinical-documents';
 
 // Types
 export type {
@@ -40,12 +44,20 @@ export type {
   ExtractionEval,
   ConversationEval,
 } from './types/index';
+export type {
+  SOAPNote, EHREntry, ClinicalLetter,
+  DiagnosisICD, ProcedureCPT, Order, Prescription, ReviewOfSystems,
+} from './schemas/clinical-documents';
 
 // Prompts
 export { DOCUMENT_EXTRACTION_SYSTEM_PROMPT } from './prompts/extraction-prompt';
 export { buildSystemPrompt } from './prompts/system-prompt';
 export type { EHRContext } from './prompts/system-prompt';
 export { SESSION_SUMMARY_SYSTEM_PROMPT } from './prompts/summary-prompt';
+export { SOAP_NOTE_SYSTEM_PROMPT } from './prompts/soap-note-prompt';
+export { EHR_ENTRY_SYSTEM_PROMPT } from './prompts/ehr-entry-prompt';
+export { CLINICAL_LETTER_SYSTEM_PROMPT, buildLetterContext } from './prompts/clinical-letter-prompt';
+export type { LetterContextParams } from './prompts/clinical-letter-prompt';
 
 // EHR
 export { hydrateEHRContext } from './ehr/hydration';

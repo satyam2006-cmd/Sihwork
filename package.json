@@ -7,9 +7,10 @@
   "scripts": {
     "dev:patient": "npm run dev -w apps/patient",
     "dev:doctor": "npm run dev -w apps/doctor",
+    "dev:portal": "npm run dev -w apps/portal",
     "dev:ws": "tsx watch server/ws-server.ts",
-    "dev:all": "concurrently \"npm run dev:patient\" \"npm run dev:doctor\" \"npm run dev:ws\"",
-    "dev:kill": "{ lsof -ti :3000; lsof -ti :3001; lsof -ti :3002; } 2>/dev/null | sort -u | xargs kill -9 2>/dev/null; echo 'Ports 3000, 3001, 3002 freed'",
+    "dev:all": "concurrently \"npm run dev:patient\" \"npm run dev:doctor\" \"npm run dev:portal\" \"npm run dev:ws\"",
+    "dev:kill": "{ lsof -ti :3000; lsof -ti :3001; lsof -ti :3002; lsof -ti :3003; } 2>/dev/null | sort -u | xargs kill -9 2>/dev/null; echo 'Ports 3000, 3001, 3002, 3003 freed'",
     "test:stress-ehr": "tsx tests/stress-ehr.ts",
     "test:stress-conversation": "tsx tests/stress-conversation.ts",
     "test:eval-extraction": "tsx tests/eval-extraction.ts",
@@ -20,7 +21,9 @@
     "test:medagentbench": "tsx tests/medagentbench.ts",
     "test:medagentbench-visualize": "tsx tests/visualize.ts -- --medagentbench",
     "test:medxpertqa": "tsx tests/medxpertqa.ts",
-    "test:medxpertqa-visualize": "tsx tests/visualize.ts -- --medxpertqa"
+    "test:medxpertqa-visualize": "tsx tests/visualize.ts -- --medxpertqa",
+    "test:aci-bench": "tsx tests/aci-bench.ts",
+    "test:aci-bench-visualize": "tsx tests/visualize.ts -- --aci-bench"
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",

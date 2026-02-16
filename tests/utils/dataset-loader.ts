@@ -494,6 +494,60 @@ function normalizeMedAgentTasks(data: unknown): MedAgentRawTask[] {
 }
 
 // ---------------------------------------------------------------------------
+// ACI-BENCH loading
+// ---------------------------------------------------------------------------
+
+export interface ACIBenchSample {
+  id: string;        // from `file` field
+  dialogue: string;  // from `src` field — [doctor]/[patient] tagged lines
+  reference: string; // from `tgt` field — reference structured note
+}
+
+/**
+ * Load ACI-BENCH samples from HuggingFace.
+ * Dataset: mkieffer/ACI-Bench, CC BY 4.0
+ * 207 total samples across test1+test2+test3 (120 test samples).
+ */
+export async function loadACIBench(
+  splits: string[] = ['test1', 'test2', 'test3'],
+): Promise<ACIBenchSample[]> {
+  const allSamples: ACIBenchSample[] = [];
+
+  for (const split of splits) {
+    // Don't pass columns — hyparquet's String() coercion mangles large text
+    // fields when columns are specified (same issue as MedXpertQA)
+    const rows = await downloadHFDataset(
+      'mkieffer/ACI-Bench',
+      split,
+      `aci-bench/aci-bench-${split}.json`,
+      10_000,
+    );
+
+    const samples = rows.map((row: unknown, index: number) => {
+      const r = row as Record<string, unknown>;
+
+      // hyparquet may return arrays or positional keys instead of column names
+      // Column order: 0=file, 1=src, 2=tgt
+      const isArray = Array.isArray(row);
+      const hasNamedKeys = !isArray && ('src' in r || 'tgt' in r);
+      const rawFile = hasNamedKeys ? r.file : isArray ? (row as unknown[])[0] : r['0'];
+      const rawSrc = hasNamedKeys ? r.src : isArray ? (row as unknown[])[1] : r['1'];
+      const rawTgt = hasNamedKeys ? r.tgt : isArray ? (row as unknown[])[2] : r['2'];
+
+      return {
+        id: String(rawFile || `sample-${index}`),
+        dialogue: String(rawSrc || ''),
+        reference: String(rawTgt || ''),
+      };
+    });
+
+    allSamples.push(...samples);
+  }
+
+  return allSamples;
+}
+
+// ---------------------------------------------------------------------------
 // Synthetic patient generation
 // ---------------------------------------------------------------------------
 

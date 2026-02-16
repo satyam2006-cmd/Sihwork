@@ -132,7 +132,7 @@ export default function PatientDetailPage({
             <div>
               <span className="text-gray-500 text-sm">Allergies</span>
               <div className="flex flex-wrap gap-1 mt-1">
-                {patient.allergies.length > 0
+                {Array.isArray(patient.allergies) && patient.allergies.length > 0
                   ? patient.allergies.map((a, i) => (
                       <Badge key={i} variant="destructive">
                         {a}
@@ -145,7 +145,7 @@ export default function PatientDetailPage({
             <div>
               <span className="text-gray-500 text-sm">Chronic Conditions</span>
               <div className="flex flex-wrap gap-1 mt-1">
-                {patient.chronic_conditions.length > 0
+                {Array.isArray(patient.chronic_conditions) && patient.chronic_conditions.length > 0
                   ? patient.chronic_conditions.map((c, i) => (
                       <Badge key={i} variant="secondary">
                         {c}
@@ -160,7 +160,7 @@ export default function PatientDetailPage({
                 Current Medications
               </span>
               <div className="flex flex-wrap gap-1 mt-1">
-                {patient.current_medications.length > 0
+                {Array.isArray(patient.current_medications) && patient.current_medications.length > 0
                   ? patient.current_medications.map((m, i) => (
                       <Badge key={i} variant="outline">
                         {m}
@@ -179,7 +179,7 @@ export default function PatientDetailPage({
           <CardTitle>Documents</CardTitle>
         </CardHeader>
         <CardContent>
-          {patient.documents.length === 0 ? (
+          {!Array.isArray(patient.documents) || patient.documents.length === 0 ? (
             <p className="text-gray-500 text-sm">No documents uploaded.</p>
           ) : (
             <Table>
@@ -226,7 +226,7 @@ export default function PatientDetailPage({
           <CardTitle>Session History</CardTitle>
         </CardHeader>
         <CardContent>
-          {patient.sessions.length === 0 ? (
+          {!Array.isArray(patient.sessions) || patient.sessions.length === 0 ? (
             <p className="text-gray-500 text-sm">No sessions yet.</p>
           ) : (
             <Table>

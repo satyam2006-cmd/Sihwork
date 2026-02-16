@@ -1,0 +1,106 @@
+{
+  "timestamp": "2026-02-16T02:27:59.368Z",
+  "config": {
+    "model": "claude-sonnet-4-5-20250929",
+    "sampleCount": 5,
+    "concurrency": 5
+  },
+  "thresholds": {
+    "aci_overall_rouge": 0.25,
+    "aci_subjective_rouge": 0.2,
+    "aci_objective_rouge": 0.15,
+    "aci_assessment_rouge": 0.2,
+    "aci_plan_rouge": 0.2
+  },
+  "metrics": {
+    "aci_overall_rouge": 0,
+    "aci_subjective_rouge": 0,
+    "aci_objective_rouge": 0,
+    "aci_assessment_rouge": 0,
+    "aci_plan_rouge": 0
+  },
+  "sectionScores": {
+    "subjective": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "objective": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "assessment": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "plan": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "successCount": 5,
+  "errorCount": 0,
+  "results": [
+    {
+      "id": "",
+      "overallRouge": 0,
+      "sectionRouge": {
+        "subjective": 0,
+        "objective": 0,
+        "assessment": 0,
+        "plan": 0
+      }
+    },
+    {
+      "id": "",
+      "overallRouge": 0,
+      "sectionRouge": {
+        "subjective": 0,
+        "objective": 0,
+        "assessment": 0,
+        "plan": 0
+      }
+    },
+    {
+      "id": "",
+      "overallRouge": 0,
+      "sectionRouge": {
+        "subjective": 0,
+        "objective": 0,
+        "assessment": 0,
+        "plan": 0
+      }
+    },
+    {
+      "id": "",
+      "overallRouge": 0,
+      "sectionRouge": {
+        "subjective": 0,
+        "objective": 0,
+        "assessment": 0,
+        "plan": 0
+      }
+    },
+    {
+      "id": "",
+      "overallRouge": 0,
+      "sectionRouge": {
+        "subjective": 0,
+        "objective": 0,
+        "assessment": 0,
+        "plan": 0
+      }
+    }
+  ]
+}

@@ -90,7 +90,10 @@ export default function DashboardLayout({
             variant="outline"
             size="sm"
             className="w-full"
-            onClick={signOut}
+            onClick={async () => {
+              try { await signOut(); } catch { /* proceed to redirect */ }
+              window.location.href = "/login";
+            }}
           >
             Sign Out
           </Button>

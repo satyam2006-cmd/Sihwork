@@ -57,6 +57,9 @@ export async function POST(
       success: true,
       visit_record_id: result.visit_record_id,
       summary_id: result.summary_id,
+      soap_note_id: result.soap_note_id,
+      ehr_entry_id: result.ehr_entry_id,
+      clinical_letter_ids: result.clinical_letter_ids,
       patient_updated: result.patient_updated,
       errors: result.errors,
     });

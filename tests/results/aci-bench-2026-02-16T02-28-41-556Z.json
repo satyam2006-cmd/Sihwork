@@ -1,0 +1,64 @@
+{
+  "timestamp": "2026-02-16T02:28:41.556Z",
+  "config": {
+    "model": "claude-sonnet-4-5-20250929",
+    "sampleCount": 2,
+    "concurrency": 5
+  },
+  "thresholds": {
+    "aci_overall_rouge": 0.25,
+    "aci_subjective_rouge": 0.2,
+    "aci_objective_rouge": 0.15,
+    "aci_assessment_rouge": 0.2,
+    "aci_plan_rouge": 0.2
+  },
+  "metrics": {
+    "aci_overall_rouge": 0.10293060050341604,
+    "aci_subjective_rouge": 0.05323110905635177,
+    "aci_objective_rouge": 0.0433811064879026,
+    "aci_assessment_rouge": 0.0345584835876098,
+    "aci_plan_rouge": 0.04910874813787435
+  },
+  "sectionScores": {
+    "subjective": [
+      0.04497354497354497,
+      0.061488673139158574
+    ],
+    "objective": [
+      0.031746031746031744,
+      0.05501618122977346
+    ],
+    "assessment": [
+      0.023809523809523808,
+      0.045307443365695796
+    ],
+    "plan": [
+      0.05291005291005291,
+      0.045307443365695796
+    ]
+  },
+  "successCount": 2,
+  "errorCount": 0,
+  "results": [
+    {
+      "id": "CHIEF COMPLAINT\n\nUpper respiratory infection.\n\nHISTORY OF PRESENT ILLNESS\n\nAndrew Campbell is a 59-year-old male with a past medical history significant for depression, type 2 diabetes, and hypertension. He presents today with an upper respiratory infection.\n\nThe patient reports that he has been doing a bit of work out in the yard in the last week or so. He started to feel really tired and short of breath. The patient denies coughing up anything, but he feels like he will soon be coughing up phlegm. He denies having a fever, but he felt a little warm. He attributed this to exerting himself. He reports that his elbows hurt quite a bit. He notes his knees were pretty tired and he felt some tension around his knees. The patient attributes these symptoms to lifting heavy bags. He has not been wearing a mask as much recently. He believes that he caught his first cold and his symptoms have worsened. He has had both of his COVID vaccinations.\n\nHe denies any history of seasonal allergies.\n\nRegarding his depression, he states it has been a crazy year and a half. He was a little concerned about that, but for the most part, he has been doing well with it. His wife got him into barre classes and this has been relaxing.\n\nRegarding his diabetes, he has been monitoring his sugar levels while he is at work, but is not as consistent on Saturdays and Sundays. His diet has been pretty good for the most part, except for some house parties. They have not been elevated since his respiratory symptoms began.\n\nThe patient has been monitoring his blood pressure at home. He reports that he is very regular with monitoring his blood pressure during the week, though less consistently on weekends. He reports his blood pressure has been under control. He has continued to utilize lisinopril 20 mg, daily.\n\nThe patient denies nausea, vomiting, diarrhea.\n\nREVIEW OF SYSTEMS\n\n Constitutional: Denies fever.\n Cardiovascular: Endorses dyspnea on exertion.\n Respiratory: Endorses shortness of breath and cough.\n Gastrointestinal: Denies nausea or diarrhea.\n Musculoskeletal: Endorses bilateral elbow and knee pain.\n Psychiatric: Endorses depression.\n\nPHYSICAL EXAMINATION\n\n Respiratory: Scattered rhonchi bilaterally, clears with cough.\n Cardiovascular: No murmurs, gallops, or rubs. No extra heart sounds.\n Musculoskeletal: Edema in the bilateral lower extremities. Pain to palpation of the bilateral elbows.\n\nRESULTS\n\nX-ray of the chest is unremarkable. No airspace disease. No signs of pneumonia.\n\nHemoglobin A1c is elevated at 8.\n\nASSESSMENT AND PLAN\n\nAndrew Campbell is a 59-year-old male with a past medical history significant for depression, type 2 diabetes, and hypertension. He presents today with an upper respiratory infection.\n\nUpper respiratory infection.\n Medical Reasoning: I believe he has contracted a viral syndrome. His chest x-ray was unremarkable and he has received both doses of the COVID-19 vaccination.\n Additional Testing: We will obtain a COVID-19 test to rule this out.\n Medical Treatment: I recommend he use Robitussin for cough, as well as ibuprofen or Tylenol if he develops a fever.\n\nDepression.\n Medical Reasoning: He has been practicing barre classes and is doing well overall.\n Medical Treatment: I offered medication or psychotherapy, but the patient opted to defer at this time.\n\nDiabetes type 2.\n Medical Reasoning: His blood glucose levels have been well controlled based on home monitoring, but his recent hemoglobin A1c was elevated.\n Additional Testing: We will repeat a hemoglobin A1c in 4 months.\n Medical Treatment: We will increase his metformin to 1000 mg twice daily.\n\nHypertension.\n Medical Reasoning: He has been compliant with lisinopril and his blood pressures have been well controlled based on home monitoring.\n Additional Testing: We will order a lipid panel.\n Medical Treatment: He will continue on lisinopril 20 mg once daily. This was refilled today.\n\nFollow up: I would like to see him back in approximately 4 months.\n\nPatient Agreements: The patient understands and agrees with the recommended medical treatment plan.",
+      "overallRouge": 0.09259259259259259,
+      "sectionRouge": {
+        "subjective": 0.04497354497354497,
+        "objective": 0.031746031746031744,
+        "assessment": 0.023809523809523808,
+        "plan": 0.05291005291005291
+      }
+    },
+    {
+      "id": "CHIEF COMPLAINT\n\nAnnual exam.\n\nHISTORY OF PRESENT ILLNESS\n\nAndrea Roberts is a 52-year-old female with a past medical history significant for rheumatoid arthritis, atrial fibrillation, and reflux, who presents today for her annual exam. It has been a year since she was last seen.\n\nThe patient states she is doing well. She has been walking, exercising, and doing yoga, which has helped with her arthritis. She denies issues with stiffness, pain, or flare ups over the last year. The patient has continued utilizing methotrexate 2.5 mg once a week and denies issues with that.\n\nIn terms of her atrial fibrillation, she endorses continued palpitations. The last episode she had was about 1 week ago. She has noticed that when she starts to get stressed they start to flare up again. She has tried meditation and running with her dog for stress relief, however these have not been helpful. The patient had called last month and had an event monitor done.\n\nRegarding her GERD, she has continued to utilize Protonix 40 mg a day. The patient has cut out soda, which seemed to help. She has not had a flare up in over 5 months.\n\nThe patient endorses nasal congestion because of her allergies. She denies chest pain, shortness of breath, nausea, and vomitting.\n\nREVIEW OF SYSTEMS\n\n Ears, Nose, Mouth and Throat: Endorses nasal congestion from allergies.\n Cardiovascular: Denies chest pain or dyspnea. Endorses palpitations.\n Respiratory: Denies shortness of breath.\n Musculoskeletal: Denies joint pain.\n\nPHYSICAL EXAMINATION\n\n Respiratory: Lungs are clear to auscultation bilaterally. No wheezes, rales, or rhonchi.\n Cardiovascular: Regular rate and rhythm. Slight 2/6 systolic ejection murmur.\n Musculoskeletal: No lower extremity edema. Edema and erythema of the right elbow. Pain to palpation of the right elbow.\n\nRESULTS\n\nEvent monitor: Positive for conversion pause.\n\nAutoimmune panel: Normal. Well controlled rheumatoid arthritis.\n\nASSESSMENT AND PLAN\n\nAndrea Roberts is a 52-year-old female with a past medical history significant for rheumatoid arthritis, atrial fibrillation, and reflux, who presents today for her annual exam. It has been a year since she was last seen.\n\nRheumatoid arthritis.\n Medical Reasoning: The patient has remained active and has been compliant with methotrexate once weekly. Her recent autoimmune panel was normal.\n Medical Treatment: She will continue on methotrexate 2.5 mg once weekly. This was refilled today.\n Specialist Referrals: If she needs a referral back to the rheumatologist, she will let me know.\n\nAtrial fibrillation.\n Medical Reasoning: She continues to experience episodes of palpitations. Her most recent episode was about 1 week ago. She is in normal sinus rhythm today, but her recent cardiac event monitor demonstrated a conversion pause.\n Specialist Referrals: We will refer her to cardiology for a cardiac ablation.\n\nGERD.\n Medical Reasoning: She has been compliant with dietary modifications and denies any episodes in approximately 5 months.\n Medical Treatment: Continue on Protonix 40 mg daily.\n Patient Education and Counseling: She could continue with dietary modifications and avoid known dietary triggers.\n\nPatient Agreements: The patient understands and agrees with the recommended medical treatment plan.\n",
+      "overallRouge": 0.11326860841423948,
+      "sectionRouge": {
+        "subjective": 0.061488673139158574,
+        "objective": 0.05501618122977346,
+        "assessment": 0.045307443365695796,
+        "plan": 0.045307443365695796
+      }
+    }
+  ]
+}

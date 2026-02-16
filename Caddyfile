@@ -1,0 +1,21 @@
+{$DOMAIN:localhost} {
+	# WebSocket server — must be before /patient/* to avoid conflicts
+	handle /ws {
+		reverse_proxy {$WS_HOST:localhost:3001}
+	}
+
+	# Doctor app (expects basePath=/doctor)
+	handle /doctor/* {
+		reverse_proxy {$DOCTOR_HOST:localhost:3002}
+	}
+
+	# Patient app (expects basePath=/patient)
+	handle /patient/* {
+		reverse_proxy {$PATIENT_HOST:localhost:3000}
+	}
+
+	# Portal app — catch-all
+	handle {
+		reverse_proxy {$PORTAL_HOST:localhost:3003}
+	}
+}

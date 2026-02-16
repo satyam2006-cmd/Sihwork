@@ -45,6 +45,9 @@ export interface GetSessionParams {
   include_visit_record?: boolean;
   include_summary?: boolean;
   include_patient_name?: boolean;
+  include_soap_note?: boolean;
+  include_ehr_entry?: boolean;
+  include_clinical_letters?: boolean;
   verify_owner_user_id?: string;
 }
 
@@ -53,6 +56,9 @@ export interface GetSessionResult {
   visit_record?: Record<string, unknown> | null;
   summary?: Record<string, unknown> | null;
   patient_name?: string;
+  soap_note?: Record<string, unknown> | null;
+  ehr_entry?: Record<string, unknown> | null;
+  clinical_letters?: Record<string, unknown>[];
 }
 
 export interface UpdateSessionParams {
@@ -104,6 +110,89 @@ export interface WriteSessionSummaryParams {
 
 export interface ReviewVisitRecordParams {
   session_id: string;
+}
+
+// ─── SOAP Notes ───
+
+export interface WriteSOAPNoteParams {
+  session_id: string;
+  patient_id: string;
+  subjective: string;
+  objective: string;
+  assessment: string;
+  plan: string;
+}
+
+export interface UpdateSOAPNoteParams {
+  soap_note_id: string;
+  subjective?: string;
+  objective?: string;
+  assessment?: string;
+  plan?: string;
+  status?: 'draft' | 'edited' | 'finalized';
+}
+
+// ─── EHR Entries ───
+
+export interface WriteEHREntryParams {
+  session_id: string;
+  patient_id: string;
+  encounter_date?: string;
+  encounter_type?: string;
+  chief_complaint: string;
+  history_of_present_illness: string;
+  past_medical_history?: string;
+  review_of_systems?: Record<string, string>;
+  physical_exam?: string;
+  assessment_and_plan: string;
+  diagnoses_icd?: unknown[];
+  procedures_cpt?: unknown[];
+  orders?: unknown[];
+  prescriptions?: unknown[];
+  follow_up_instructions?: string;
+}
+
+export interface UpdateEHREntryParams {
+  ehr_entry_id: string;
+  encounter_date?: string;
+  encounter_type?: string;
+  chief_complaint?: string;
+  history_of_present_illness?: string;
+  past_medical_history?: string;
+  review_of_systems?: Record<string, string>;
+  physical_exam?: string;
+  assessment_and_plan?: string;
+  diagnoses_icd?: unknown[];
+  procedures_cpt?: unknown[];
+  orders?: unknown[];
+  prescriptions?: unknown[];
+  follow_up_instructions?: string;
+  status?: 'draft' | 'edited' | 'finalized';
+}
+
+// ─── Clinical Letters ───
+
+export interface WriteClinicalLetterParams {
+  session_id: string;
+  patient_id: string;
+  letter_type: string;
+  recipient_name?: string;
+  recipient_title?: string;
+  recipient_institution?: string;
+  subject_line: string;
+  body: string;
+  generated_by?: 'ai' | 'doctor';
+}
+
+export interface UpdateClinicalLetterParams {
+  letter_id: string;
+  letter_type?: string;
+  recipient_name?: string;
+  recipient_title?: string;
+  recipient_institution?: string;
+  subject_line?: string;
+  body?: string;
+  status?: 'draft' | 'edited' | 'finalized';
 }
 
 // ─── Documents ───

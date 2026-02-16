@@ -33,7 +33,7 @@ export function DashboardShell({ children, userEmail, patientName }: DashboardSh
           Your account doesn&apos;t have a patient profile. Please sign out and create a new account.
         </p>
         <Button variant="outline" onClick={async () => {
-          await signOut();
+          try { await signOut(); } catch { /* proceed to redirect */ }
           window.location.href = "/login";
         }}>Sign Out</Button>
       </div>
@@ -47,7 +47,7 @@ export function DashboardShell({ children, userEmail, patientName }: DashboardSh
     .toUpperCase();
 
   const handleSignOut = async () => {
-    await signOut();
+    try { await signOut(); } catch { /* proceed to redirect */ }
     window.location.href = "/login";
   };
 

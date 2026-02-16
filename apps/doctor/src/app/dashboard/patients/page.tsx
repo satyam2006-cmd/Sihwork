@@ -95,7 +95,8 @@ export default function PatientsPage() {
                 <TableCell>{patient.session_count}</TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
-                    {patient.chronic_conditions.length > 0
+                    {Array.isArray(patient.chronic_conditions) &&
+                    patient.chronic_conditions.length > 0
                       ? patient.chronic_conditions.map((c, i) => (
                           <Badge key={i} variant="secondary">
                             {c}

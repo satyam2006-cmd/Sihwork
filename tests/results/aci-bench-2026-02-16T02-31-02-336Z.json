@@ -1,0 +1,106 @@
+{
+  "timestamp": "2026-02-16T02:31:02.337Z",
+  "config": {
+    "model": "claude-sonnet-4-5-20250929",
+    "sampleCount": 5,
+    "concurrency": 5
+  },
+  "thresholds": {
+    "aci_overall_rouge": 0.25,
+    "aci_subjective_rouge": 0.2,
+    "aci_objective_rouge": 0.15,
+    "aci_assessment_rouge": 0.08,
+    "aci_plan_rouge": 0.2
+  },
+  "metrics": {
+    "aci_overall_rouge": 0.4055238278447777,
+    "aci_subjective_rouge": 0.2641684641176544,
+    "aci_objective_rouge": 0.45096620485246514,
+    "aci_assessment_rouge": 0.1272215490050046,
+    "aci_plan_rouge": 0.2584231550208991
+  },
+  "sectionScores": {
+    "subjective": [
+      0.23404255319148937,
+      0.3283582089552239,
+      0.3393939393939394,
+      0.41904761904761906,
+      0
+    ],
+    "objective": [
+      0.5609756097560976,
+      0.46808510638297873,
+      0.47619047619047616,
+      0.5142857142857142,
+      0.23529411764705882
+    ],
+    "assessment": [
+      0.1417910447761194,
+      0.1694915254237288,
+      0.17482517482517482,
+      0.15,
+      0
+    ],
+    "plan": [
+      0.26119402985074625,
+      0.2288135593220339,
+      0.24475524475524477,
+      0.1323529411764706,
+      0.425
+    ]
+  },
+  "successCount": 5,
+  "errorCount": 0,
+  "results": [
+    {
+      "id": "D2N088",
+      "overallRouge": 0.3466666666666667,
+      "sectionRouge": {
+        "subjective": 0.23404255319148937,
+        "objective": 0.5609756097560976,
+        "assessment": 0.1417910447761194,
+        "plan": 0.26119402985074625
+      }
+    },
+    {
+      "id": "D2N089",
+      "overallRouge": 0.4050632911392405,
+      "sectionRouge": {
+        "subjective": 0.3283582089552239,
+        "objective": 0.46808510638297873,
+        "assessment": 0.1694915254237288,
+        "plan": 0.2288135593220339
+      }
+    },
+    {
+      "id": "D2N090",
+      "overallRouge": 0.38275862068965516,
+      "sectionRouge": {
+        "subjective": 0.3393939393939394,
+        "objective": 0.47619047619047616,
+        "assessment": 0.17482517482517482,
+        "plan": 0.24475524475524477
+      }
+    },
+    {
+      "id": "D2N091",
+      "overallRouge": 0.4301675977653631,
+      "sectionRouge": {
+        "subjective": 0.41904761904761906,
+        "objective": 0.5142857142857142,
+        "assessment": 0.15,
+        "plan": 0.1323529411764706
+      }
+    },
+    {
+      "id": "D2N092",
+      "overallRouge": 0.46296296296296297,
+      "sectionRouge": {
+        "subjective": 0,
+        "objective": 0.23529411764705882,
+        "assessment": 0,
+        "plan": 0.425
+      }
+    }
+  ]
+}

@@ -13,6 +13,9 @@ export async function GET(
       include_visit_record: true,
       include_summary: true,
       include_patient_name: true,
+      include_soap_note: true,
+      include_ehr_entry: true,
+      include_clinical_letters: true,
     });
 
     const session = result.session as Record<string, unknown>;
@@ -23,6 +26,9 @@ export async function GET(
       patient_name: result.patient_name || "Unknown",
       visit_record: result.visit_record || null,
       summary: result.summary || null,
+      soap_note: result.soap_note || null,
+      ehr_entry: result.ehr_entry || null,
+      clinical_letters: result.clinical_letters || [],
     });
   } catch (error) {
     if (error instanceof Error && error.message === "Session not found") {
@@ -51,6 +57,9 @@ export async function PATCH(
       include_visit_record: true,
       include_summary: true,
       include_patient_name: true,
+      include_soap_note: true,
+      include_ehr_entry: true,
+      include_clinical_letters: true,
     });
 
     const session = result.session as Record<string, unknown>;
@@ -61,6 +70,9 @@ export async function PATCH(
       patient_name: result.patient_name || "Unknown",
       visit_record: result.visit_record || null,
       summary: result.summary || null,
+      soap_note: result.soap_note || null,
+      ehr_entry: result.ehr_entry || null,
+      clinical_letters: result.clinical_letters || [],
     });
   } catch (error) {
     if (error instanceof Error && error.message === "Session not found") {
