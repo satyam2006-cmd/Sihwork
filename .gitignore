@@ -50,6 +50,7 @@ node_modules/
 .next/
 out/
 *.tsbuildinfo
+*.log
 
 # Testing
 .pytest_cache/

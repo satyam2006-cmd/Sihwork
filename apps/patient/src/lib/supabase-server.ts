@@ -12,11 +12,15 @@ export function createServiceClient() {
 
 export async function createServerComponentClient() {
   const cookieStore = await cookies();
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "/";
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: {
+        path: basePath,
+      },
       cookies: {
         getAll() {
           return cookieStore.getAll();
@@ -24,7 +28,7 @@ export async function createServerComponentClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
+              cookieStore.set(name, value, { ...options, path: basePath });
             });
           } catch {
             // setAll fails in server components — that's expected.

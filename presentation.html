@@ -732,34 +732,34 @@
       </div>
     </div>
 
-    <!-- Right: Tool Calling -->
+    <!-- Right: Context Management -->
     <div style="flex:1; background:rgba(0,168,150,0.12); padding:20px 22px; border-radius:12px; border:1px solid rgba(0,168,150,0.25);">
-      <div style="font-size:12px; font-weight:600; color:var(--mint); margin-bottom:12px;">Agent Tool Calls</div>
-      <div style="display:flex; flex-direction:column; gap:10px;">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <div style="width:8px; height:8px; border-radius:50%; background:var(--teal); flex-shrink:0;"></div>
+      <div style="font-size:12px; font-weight:600; color:var(--mint); margin-bottom:10px;">Context Management</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div style="display:flex; align-items:flex-start; gap:10px;">
+          <div style="width:8px; height:8px; border-radius:50%; background:var(--teal); flex-shrink:0; margin-top:4px;"></div>
           <div>
-            <div style="font-size:12px; color:var(--white); font-weight:600;">Fetch Patient Context</div>
-            <div style="font-size:10px; color:rgba(255,255,255,0.6);">Hydrates EHR with temporal markers into the prompt</div>
+            <div style="font-size:11px; color:var(--white); font-weight:600;">EHR Hydration at Session Start</div>
+            <div style="font-size:10px; color:rgba(255,255,255,0.6);">Demographics, allergies, medications, prior sessions loaded into system prompt. Full documents lazy-loaded on demand via tool calls.</div>
           </div>
         </div>
-        <div style="display:flex; align-items:center; gap:10px;">
-          <div style="width:8px; height:8px; border-radius:50%; background:var(--seafoam); flex-shrink:0;"></div>
+        <div style="display:flex; align-items:flex-start; gap:10px;">
+          <div style="width:8px; height:8px; border-radius:50%; background:var(--seafoam); flex-shrink:0; margin-top:4px;"></div>
           <div>
-            <div style="font-size:12px; color:var(--white); font-weight:600;">Update Session Notes</div>
-            <div style="font-size:10px; color:rgba(255,255,255,0.6);">Writes structured notes to DB after each exchange</div>
+            <div style="font-size:11px; color:var(--white); font-weight:600;">Auto-Compaction</div>
+            <div style="font-size:10px; color:rgba(255,255,255,0.6);">When conversation exceeds budget, older turns are summarized by Haiku. Last 10 turns always kept verbatim.</div>
           </div>
         </div>
-        <div style="display:flex; align-items:center; gap:10px;">
-          <div style="width:8px; height:8px; border-radius:50%; background:var(--red); flex-shrink:0;"></div>
+        <div style="display:flex; align-items:flex-start; gap:10px;">
+          <div style="width:8px; height:8px; border-radius:50%; background:var(--mint); flex-shrink:0; margin-top:4px;"></div>
           <div>
-            <div style="font-size:12px; color:var(--white); font-weight:600;">Flag Emergency</div>
-            <div style="font-size:10px; color:rgba(255,255,255,0.6);">Haiku scans every turn for life-threatening conditions</div>
+            <div style="font-size:11px; color:var(--white); font-weight:600;">3 Tool Calls per Turn</div>
+            <div style="font-size:10px; color:rgba(255,255,255,0.6);">Fetch Patient Context &middot; Update Session Notes &middot; Flag Emergency</div>
           </div>
         </div>
       </div>
-      <div style="margin-top:14px; padding:10px 14px; background:rgba(255,255,255,0.06); border-radius:8px;">
-        <div style="font-size:10px; color:rgba(255,255,255,0.5); line-height:1.5;"><em>Voice support in 10+ Indian languages via Sarvam ASR/TTS</em></div>
+      <div style="margin-top:12px; padding:8px 12px; background:rgba(255,255,255,0.06); border-radius:8px;">
+        <div style="font-size:9px; color:rgba(255,255,255,0.45); line-height:1.5;"><em>Voice in 10+ Indian languages via Sarvam ASR/TTS</em></div>
       </div>
     </div>
   </div>
@@ -840,29 +840,29 @@
       </div>
     </div>
 
-    <!-- Right: Key Design Choices -->
+    <!-- Right: Context & Temporal Awareness -->
     <div style="flex:1; background:rgba(0,168,150,0.12); padding:18px 22px; border-radius:12px; border:1px solid rgba(0,168,150,0.25);">
-      <div style="font-size:12px; font-weight:600; color:var(--mint); margin-bottom:10px;">Key Design Choices</div>
-      <div style="display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:12px; font-weight:600; color:var(--mint); margin-bottom:10px;">Context &amp; Temporal Awareness</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
         <div style="display:flex; align-items:flex-start; gap:10px;">
           <div style="width:8px; height:8px; border-radius:50%; background:var(--teal); flex-shrink:0; margin-top:4px;"></div>
           <div>
-            <div style="font-size:11px; color:var(--white); font-weight:600;">Human-in-the-Loop</div>
-            <div style="font-size:10px; color:rgba(255,255,255,0.6);">Every AI document passes through the doctor for review before being finalized</div>
+            <div style="font-size:11px; color:var(--white); font-weight:600;">Transcript Compaction</div>
+            <div style="font-size:10px; color:rgba(255,255,255,0.6);">Full transcript compacted to 50K tokens: last 60% kept verbatim, older 40% summarized</div>
           </div>
         </div>
         <div style="display:flex; align-items:flex-start; gap:10px;">
           <div style="width:8px; height:8px; border-radius:50%; background:var(--seafoam); flex-shrink:0; margin-top:4px;"></div>
           <div>
-            <div style="font-size:11px; color:var(--white); font-weight:600;">Temporal Context</div>
-            <div style="font-size:10px; color:rgba(255,255,255,0.6);">EHR data carries temporal markers so AI distinguishes old vs new conditions</div>
+            <div style="font-size:11px; color:var(--white); font-weight:600;">EHR Temporal Markers</div>
+            <div style="font-size:10px; color:rgba(255,255,255,0.6);">Patient history injected as &ldquo;PRE-EXISTING&rdquo; section. Extraction rules only pull from &ldquo;TODAY&rsquo;S TRANSCRIPT&rdquo;.</div>
           </div>
         </div>
         <div style="display:flex; align-items:flex-start; gap:10px;">
           <div style="width:8px; height:8px; border-radius:50%; background:var(--mint); flex-shrink:0; margin-top:4px;"></div>
           <div>
-            <div style="font-size:11px; color:var(--white); font-weight:600;">Inline Editing</div>
-            <div style="font-size:10px; color:rgba(255,255,255,0.6);">Doctors edit SOAP notes, EHR entries, and letters directly in the dashboard</div>
+            <div style="font-size:11px; color:var(--white); font-weight:600;">Human-in-the-Loop</div>
+            <div style="font-size:10px; color:rgba(255,255,255,0.6);">Every AI document passes through the doctor for review. Inline editing for all document types.</div>
           </div>
         </div>
       </div>
