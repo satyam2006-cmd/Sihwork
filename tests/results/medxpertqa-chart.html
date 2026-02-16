@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MedXpertQA — Expert Medical Reasoning Benchmark</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      padding: 2rem;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .subtitle { color: #64748b; font-size: 0.9rem; margin-bottom: 2rem; }
+    .stats-row { display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
+    .stat-card {
+      background: white; border-radius: 12px; padding: 1.25rem 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08); min-width: 140px; flex: 1;
+    }
+    .stat-card .label { font-size: 0.8rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-card .value { font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; }
+    .stat-card .value.pass { color: #10b981; }
+    .stat-card .value.fail { color: #ef4444; }
+    .stat-card .value.neutral { color: #3b82f6; }
+    .chart-card {
+      background: white; border-radius: 12px; padding: 1.5rem;
+      margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .chart-container { position: relative; height: 360px; }
+    .metric-table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.875rem; }
+    .metric-table th {
+      text-align: left; padding: 0.625rem 1rem; background: #f1f5f9;
+      font-weight: 600; border-bottom: 2px solid #e2e8f0;
+    }
+    .metric-table td { padding: 0.5rem 1rem; border-bottom: 1px solid #f1f5f9; }
+    .metric-table tr:hover td { background: #f8fafc; }
+    .badge { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .badge.pass { background: #d1fae5; color: #065f46; }
+    .badge.fail { background: #fee2e2; color: #991b1b; }
+    .badge.none { background: #f1f5f9; color: #64748b; }
+    .reference-card {
+      background: white; border-radius: 12px; padding: 1.5rem;
+      margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .reference-card h2 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem; }
+    .reference-row { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #f1f5f9; }
+    .reference-row:last-child { border: none; }
+    .reference-row .model { font-weight: 500; }
+    .reference-row .score { font-weight: 700; }
+    .reference-row .score.highlight { color: #3b82f6; }
+    footer { margin-top: 2rem; text-align: center; color: #94a3b8; font-size: 0.8rem; }
+    .rerun-hint {
+      margin-top: 1rem; padding: 1rem; background: #eff6ff;
+      border-radius: 8px; font-size: 0.85rem; color: #1e40af;
+    }
+    .rerun-hint code {
+      background: #dbeafe; padding: 0.125rem 0.375rem;
+      border-radius: 4px; font-family: 'SF Mono', Menlo, monospace; font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>MedXpertQA — Expert Medical Reasoning Benchmark</h1>
+    <p class="subtitle">
+      Model: claude-sonnet-4-5-20250929
+      &middot; 2/15/2026, 3:52:40 PM
+      &middot; 5 questions evaluated
+    </p>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="label">Overall Accuracy</div>
+        <div class="value fail">20.0%</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Correct</div>
+        <div class="value pass">1 / 5</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Errors</div>
+        <div class="value pass">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">10-Option MCQ</div>
+        <div class="value neutral">A–J</div>
+      </div>
+    </div>
+
+    
+    <div class="chart-card">
+      <div class="chart-container">
+        <canvas id="chart-0"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-container">
+        <canvas id="chart-1"></canvas>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-container">
+        <canvas id="chart-2"></canvas>
+      </div>
+    </div>
+
+    <div class="reference-card">
+      <h2>Published Reference Results (MedXpertQA, ICML 2025)</h2>
+      <div class="reference-row">
+        <span class="model">GPT-4o</span>
+        <span class="score">56.2%</span>
+      </div>
+      <div class="reference-row">
+        <span class="model">Claude 3.5</span>
+        <span class="score">53.8%</span>
+      </div>
+      <div class="reference-row">
+        <span class="model">Med-Gemini</span>
+        <span class="score">52.0%</span>
+      </div>
+      <div class="reference-row">
+        <span class="model">This run (claude-sonnet-4-5-20250929)</span>
+        <span class="score highlight">20.0%</span>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">All Metrics</h2>
+      <table class="metric-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Category</th>
+            <th>Score</th>
+            <th>Threshold</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+                <td><strong>Overall</strong></td>
+                <td>Overall & Task Type</td>
+                <td>20.0%</td>
+                <td>—</td>
+                <td><span class="badge none">N/A</span></td>
+              </tr>
+          <tr>
+                <td><strong>Basic Science</strong></td>
+                <td>Overall & Task Type</td>
+                <td>0.0%</td>
+                <td>—</td>
+                <td><span class="badge none">N/A</span></td>
+              </tr>
+          <tr>
+                <td><strong>Diagnosis</strong></td>
+                <td>Overall & Task Type</td>
+                <td>0.0%</td>
+                <td>—</td>
+                <td><span class="badge none">N/A</span></td>
+              </tr>
+          <tr>
+                <td><strong>Treatment</strong></td>
+                <td>Overall & Task Type</td>
+                <td>100.0%</td>
+                <td>—</td>
+                <td><span class="badge none">N/A</span></td>
+              </tr>
+          <tr>
+                <td><strong>Reasoning</strong></td>
+                <td>Question Type</td>
+                <td>20.0%</td>
+                <td>—</td>
+                <td><span class="badge none">N/A</span></td>
+              </tr>
+          <tr>
+                <td><strong>Skeletal</strong></td>
+                <td>Body Systems</td>
+                <td>0.0%</td>
+                <td>—</td>
+                <td><span class="badge none">N/A</span></td>
+              </tr>
+          <tr>
+                <td><strong>Cardiovascular</strong></td>
+                <td>Body Systems</td>
+                <td>0.0%</td>
+                <td>—</td>
+                <td><span class="badge none">N/A</span></td>
+              </tr>
+          <tr>
+                <td><strong>Respiratory</strong></td>
+                <td>Body Systems</td>
+                <td>0.0%</td>
+                <td>—</td>
+                <td><span class="badge none">N/A</span></td>
+              </tr>
+          <tr>
+                <td><strong>Muscular</strong></td>
+                <td>Body Systems</td>
+                <td>0.0%</td>
+                <td>—</td>
+                <td><span class="badge none">N/A</span></td>
+              </tr>
+          <tr>
+                <td><strong>Endocrine</strong></td>
+                <td>Body Systems</td>
+                <td>100.0%</td>
+                <td>—</td>
+                <td><span class="badge none">N/A</span></td>
+              </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rerun-hint">
+      <strong>Rerun MedXpertQA:</strong><br>
+      <code>npm run test:medxpertqa</code> — full run (~2,460 questions)<br>
+      <code>MEDXPERT_SAMPLES=10 npm run test:medxpertqa</code> — quick run with fewer questions<br>
+      <code>npm run test:medxpertqa-visualize</code> — regenerate this chart<br>
+      <code>npm run test:medxpertqa-visualize -- --compare</code> — compare last 5 runs
+    </div>
+
+    <footer>
+      Generated 2/15/2026, 3:52:46 PM &middot; MedXpertQA (Tsinghua C3I, ICML 2025)
+    </footer>
+  </div>
+
+  <script>
+    
+      new Chart(document.getElementById('chart-0'), {
+        type: 'bar',
+        data: {
+          labels: ["Overall","Basic Science","Diagnosis","Treatment"],
+          datasets: [{
+          label: "sonnet-4-5",
+          data: [0.2000,0.0000,0.0000,1.0000],
+          backgroundColor: ['rgba(59, 130, 246, 0.75)','rgba(59, 130, 246, 0.75)','rgba(59, 130, 246, 0.75)','rgba(59, 130, 246, 0.75)'],
+          borderColor: ['rgb(59, 130, 246)','rgb(59, 130, 246)','rgb(59, 130, 246)','rgb(59, 130, 246)'],
+          borderWidth: 1.5,
+          borderRadius: 4,
+        }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 1,
+              ticks: {
+                callback: v => (v * 100).toFixed(0) + '%',
+                font: { size: 12 },
+              },
+              grid: { color: 'rgba(0,0,0,0.06)' },
+            },
+            x: {
+              ticks: { font: { size: 12, weight: '500' } },
+              grid: { display: false },
+            }
+          },
+          plugins: {
+            legend: { display: false, position: 'top' },
+            title: {
+              display: true,
+              text: 'Overall & Task Type',
+              font: { size: 18, weight: '600' },
+              padding: { bottom: 16 },
+            },
+            tooltip: {
+              callbacks: {
+                label: ctx => ctx.dataset.label + ': ' + (ctx.raw * 100).toFixed(1) + '%',
+              }
+            },
+          },
+        }
+      });
+    
+
+      new Chart(document.getElementById('chart-1'), {
+        type: 'bar',
+        data: {
+          labels: ["Reasoning"],
+          datasets: [{
+          label: "sonnet-4-5",
+          data: [0.2000],
+          backgroundColor: ['rgba(16, 185, 129, 0.75)'],
+          borderColor: ['rgb(16, 185, 129)'],
+          borderWidth: 1.5,
+          borderRadius: 4,
+        }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 1,
+              ticks: {
+                callback: v => (v * 100).toFixed(0) + '%',
+                font: { size: 12 },
+              },
+              grid: { color: 'rgba(0,0,0,0.06)' },
+            },
+            x: {
+              ticks: { font: { size: 12, weight: '500' } },
+              grid: { display: false },
+            }
+          },
+          plugins: {
+            legend: { display: false, position: 'top' },
+            title: {
+              display: true,
+              text: 'Question Type',
+              font: { size: 18, weight: '600' },
+              padding: { bottom: 16 },
+            },
+            tooltip: {
+              callbacks: {
+                label: ctx => ctx.dataset.label + ': ' + (ctx.raw * 100).toFixed(1) + '%',
+              }
+            },
+          },
+        }
+      });
+    
+
+      new Chart(document.getElementById('chart-2'), {
+        type: 'bar',
+        data: {
+          labels: ["Skeletal","Cardiovascular","Respiratory","Muscular","Endocrine"],
+          datasets: [{
+          label: "sonnet-4-5",
+          data: [0.0000,0.0000,0.0000,0.0000,1.0000],
+          backgroundColor: ['rgba(245, 158, 11, 0.75)','rgba(245, 158, 11, 0.75)','rgba(245, 158, 11, 0.75)','rgba(245, 158, 11, 0.75)','rgba(245, 158, 11, 0.75)'],
+          borderColor: ['rgb(245, 158, 11)','rgb(245, 158, 11)','rgb(245, 158, 11)','rgb(245, 158, 11)','rgb(245, 158, 11)'],
+          borderWidth: 1.5,
+          borderRadius: 4,
+        }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 1,
+              ticks: {
+                callback: v => (v * 100).toFixed(0) + '%',
+                font: { size: 12 },
+              },
+              grid: { color: 'rgba(0,0,0,0.06)' },
+            },
+            x: {
+              ticks: { font: { size: 12, weight: '500' } },
+              grid: { display: false },
+            }
+          },
+          plugins: {
+            legend: { display: false, position: 'top' },
+            title: {
+              display: true,
+              text: 'Body Systems',
+              font: { size: 18, weight: '600' },
+              padding: { bottom: 16 },
+            },
+            tooltip: {
+              callbacks: {
+                label: ctx => ctx.dataset.label + ': ' + (ctx.raw * 100).toFixed(1) + '%',
+              }
+            },
+          },
+        }
+      });
+    
+  </script>
+</body>
+</html>

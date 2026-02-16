@@ -6,7 +6,9 @@ export { createServiceClient } from './supabase/server';
 export { getAnthropicClient } from './claude/client';
 export { extractDocument } from './claude/document-extractor';
 export { ConversationEngine } from './claude/conversation-engine';
-export type { ConversationToolCallbacks } from './claude/conversation-engine';
+export type { ConversationToolCallbacks, ConversationEngineOptions } from './claude/conversation-engine';
+export { MODELS, selectConversationModel } from './claude/model-router';
+export type { ModelTier, RouterContext } from './claude/model-router';
 
 // Sarvam
 export { speechToText } from './sarvam/asr';

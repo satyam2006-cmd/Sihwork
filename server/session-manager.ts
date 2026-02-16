@@ -46,7 +46,7 @@ export class SessionManager {
   private async doInitialize(): Promise<void> {
     // Hydrate EHR context
     const ehrContext = await hydrateEHRContext(this.patientId);
-    this.engine = new ConversationEngine(ehrContext);
+    this.engine = new ConversationEngine(ehrContext, undefined, { useRouter: true });
 
     // Get greeting
     const greeting = await this.engine.getGreeting();

@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     let engine = engines.get(sessionId);
     if (!engine) {
       const ehrContext = await hydrateEHRContext(patientId);
-      engine = new ConversationEngine(ehrContext);
+      engine = new ConversationEngine(ehrContext, undefined, { useRouter: true });
       engines.set(sessionId, engine);
       ensureCleanup();
     }

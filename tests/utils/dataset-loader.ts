@@ -37,6 +37,7 @@ async function downloadHFDataset(
   cacheFile: string,
   limit: number = 100,
   columns?: string[],
+  config?: string,
 ): Promise<unknown[]> {
   const cachePath = ensureCacheDir(cacheFile);
 
@@ -48,7 +49,7 @@ async function downloadHFDataset(
 
   // Try parquet download first (more reliable than the rows API)
   try {
-    const rows = await downloadViaParquet(repoId, split, limit, columns);
+    const rows = await downloadViaParquet(repoId, split, limit, columns, config);
     writeFileSync(cachePath, JSON.stringify(rows, null, 2));
     console.log(`Cached ${rows.length} rows to ${cachePath}`);
     return rows;
@@ -58,7 +59,7 @@ async function downloadHFDataset(
   }
 
   // Fallback: paginated rows API with retries
-  const rows = await downloadViaRowsAPI(repoId, split, limit);
+  const rows = await downloadViaRowsAPI(repoId, split, limit, config);
   writeFileSync(cachePath, JSON.stringify(rows, null, 2));
   console.log(`Cached ${rows.length} rows to ${cachePath}`);
   return rows;
@@ -73,14 +74,17 @@ async function downloadViaParquet(
   split: string,
   limit: number,
   columns?: string[],
+  config?: string,
 ): Promise<Record<string, string>[]> {
   // First, discover parquet file URLs for this split
   const infoUrl = `https://datasets-server.huggingface.co/parquet?dataset=${encodeURIComponent(repoId)}`;
   const infoResp = await fetch(infoUrl);
   if (!infoResp.ok) throw new Error(`Parquet info API returned ${infoResp.status}`);
 
-  const info = await infoResp.json() as { parquet_files: Array<{ split: string; url: string }> };
-  const parquetFiles = info.parquet_files.filter((f) => f.split === split);
+  const info = await infoResp.json() as { parquet_files: Array<{ split: string; config: string; url: string }> };
+  const parquetFiles = info.parquet_files.filter((f) =>
+    f.split === split && (!config || f.config === config)
+  );
   if (parquetFiles.length === 0) throw new Error(`No parquet files found for split=${split}`);
 
   const { parquetRead } = await import('hyparquet');
@@ -127,13 +131,14 @@ async function downloadViaRowsAPI(
   repoId: string,
   split: string,
   limit: number,
+  config?: string,
 ): Promise<unknown[]> {
   const allRows: unknown[] = [];
   let offset = 0;
 
   while (allRows.length < limit) {
     const pageSize = Math.min(HF_PAGE_SIZE, limit - allRows.length);
-    const url = `https://datasets-server.huggingface.co/rows?dataset=${encodeURIComponent(repoId)}&config=default&split=${split}&offset=${offset}&length=${pageSize}`;
+    const url = `https://datasets-server.huggingface.co/rows?dataset=${encodeURIComponent(repoId)}&config=${config || 'default'}&split=${split}&offset=${offset}&length=${pageSize}`;
 
     let lastError: Error | null = null;
     let rows: unknown[] | null = null;
@@ -322,6 +327,77 @@ export function generateSyntheticPatient(complexity: 'simple' | 'moderate' | 'co
   }
 
   return { patient: base, documents };
+}
+
+// ---------------------------------------------------------------------------
+// MedXpertQA loading
+// ---------------------------------------------------------------------------
+
+export interface MedXpertQASample {
+  id: string;
+  question: string;
+  options: Record<string, string>;
+  label: string;
+  medical_task: string;
+  body_system: string;
+  question_type: string;
+}
+
+/**
+ * Load MedXpertQA Text-only samples from HuggingFace.
+ * Dataset: TsinghuaC3I/MedXpertQA, config: Text, split: test
+ * 2,460 expert-level 10-option MCQ questions across 17 specialties.
+ */
+export async function loadMedXpertQA(): Promise<MedXpertQASample[]> {
+  // Don't pass columns — the `options` field is a dict/struct that gets
+  // mangled by hyparquet's String() coercion when columns are specified
+  const rows = await downloadHFDataset(
+    'TsinghuaC3I/MedXpertQA',
+    'test',
+    'medxpertqa/medxpertqa-test.json',
+    10_000,      // well above dataset size — download all
+    undefined,   // no column filtering
+    'Text',      // HF dataset config
+  );
+
+  return rows.map((row: unknown, index: number) => {
+    const r = row as Record<string, unknown>;
+
+    // hyparquet may return positional keys (0,1,2,...) instead of column names
+    // Column order: 0=id, 1=question, 2=options, 3=label, 4=medical_task, 5=body_system, 6=question_type
+    const hasNamedKeys = 'question' in r || 'id' in r;
+    const rawId = hasNamedKeys ? r.id : r['0'];
+    const rawQuestion = hasNamedKeys ? r.question : r['1'];
+    const rawOptions = hasNamedKeys ? r.options : r['2'];
+    const rawLabel = hasNamedKeys ? r.label : r['3'];
+    const rawMedicalTask = hasNamedKeys ? r.medical_task : r['4'];
+    const rawBodySystem = hasNamedKeys ? r.body_system : r['5'];
+    const rawQuestionType = hasNamedKeys ? r.question_type : r['6'];
+
+    // Handle options being either a parsed object or a JSON string
+    let options: Record<string, string>;
+    if (typeof rawOptions === 'string') {
+      try {
+        options = JSON.parse(rawOptions);
+      } catch {
+        options = {};
+      }
+    } else if (rawOptions && typeof rawOptions === 'object') {
+      options = rawOptions as Record<string, string>;
+    } else {
+      options = {};
+    }
+
+    return {
+      id: (rawId as string) || `Text-${index}`,
+      question: (rawQuestion as string) || '',
+      options,
+      label: (rawLabel as string) || '',
+      medical_task: (rawMedicalTask as string) || '',
+      body_system: (rawBodySystem as string) || '',
+      question_type: (rawQuestionType as string) || '',
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------

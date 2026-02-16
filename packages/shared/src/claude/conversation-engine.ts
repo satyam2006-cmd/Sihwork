@@ -3,6 +3,7 @@ import { getAnthropicClient } from './client';
 import { buildSystemPrompt, type EHRContext } from '../prompts/system-prompt';
 import { compactIfNeeded } from '../context/compaction';
 import { estimateTokens } from '../context/token-budget';
+import { MODELS, selectConversationModel } from './model-router';
 import type { ChatMessage } from '../types/index';
 
 // Conversation-time tool definitions for Claude tool_use
@@ -82,6 +83,11 @@ export interface ConversationToolCallbacks {
   onSessionNotes?: (notes: Record<string, unknown>) => void;
 }
 
+export interface ConversationEngineOptions {
+  /** Enable model routing: Sonnet for gathering, Opus for diagnostics. Default false. */
+  useRouter?: boolean;
+}
+
 export class ConversationEngine {
   private client: Anthropic;
   private systemPrompt: string;
@@ -95,20 +101,45 @@ export class ConversationEngine {
   private conversationSummary: string | null = null;
   private createdAt: number;
   private messageTimestamps: Map<number, string> = new Map();
+  private useRouter: boolean;
 
-  constructor(ehrContext: EHRContext, callbacks?: ConversationToolCallbacks) {
+  constructor(ehrContext: EHRContext, callbacks?: ConversationToolCallbacks, options?: ConversationEngineOptions) {
     this.client = getAnthropicClient();
     this.ehrContext = ehrContext;
     this.systemPrompt = buildSystemPrompt(ehrContext);
     this.systemPromptTokens = estimateTokens(this.systemPrompt);
     this.callbacks = callbacks || {};
     this.createdAt = Date.now();
+    this.useRouter = options?.useRouter ?? false;
+  }
+
+  /** Count user messages (excludes tool_result and [Session started] synthetic messages). */
+  private getTurnCount(): number {
+    let count = 0;
+    for (const msg of this.messages) {
+      if (msg.role === 'user' && typeof msg.content === 'string' && msg.content !== '[Session started]') {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /** Pick model based on router state, or default to Sonnet when routing is off. */
+  private selectModel(userMessage: string): string {
+    if (!this.useRouter) return MODELS.standard;
+    const model = selectConversationModel({
+      turnCount: this.getTurnCount(),
+      sessionNotes: this.sessionNotes,
+      userMessage,
+    });
+    console.log(`[model-router] turn=${this.getTurnCount()} model=${model}`);
+    return model;
   }
 
   async getGreeting(): Promise<{ content: string; isEmergency: boolean }> {
     try {
       const response = await this.client.messages.create({
-        model: 'claude-sonnet-4-5-20250929',
+        model: MODELS.standard, // Always Sonnet for greetings
         max_tokens: 500,
         system: this.systemPrompt,
         messages: [
@@ -169,6 +200,7 @@ export class ConversationEngine {
     await this.maybeCompact();
 
     // Tool_use loop: send → handle tool calls → repeat until end_turn
+    const model = this.selectModel(userMessage);
     let finalContent = '';
     let loopCount = 0;
 
@@ -178,7 +210,7 @@ export class ConversationEngine {
       let response: Anthropic.Message;
       try {
         response = await this.client.messages.create({
-          model: 'claude-sonnet-4-5-20250929',
+          model,
           max_tokens: 1024,
           system: this.systemPrompt,
           messages: this.messages,
@@ -257,6 +289,7 @@ export class ConversationEngine {
     // Compact before API call if needed
     await this.maybeCompact();
 
+    const model = this.selectModel(userMessage);
     let finalContent = '';
     let needsToolLoop = true;
     let loopCount = 0;
@@ -268,7 +301,7 @@ export class ConversationEngine {
       let stream: ReturnType<typeof this.client.messages.stream>;
       try {
         stream = this.client.messages.stream({
-          model: 'claude-sonnet-4-5-20250929',
+          model,
           max_tokens: 1024,
           system: this.systemPrompt,
           messages: this.messages,

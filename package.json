@@ -18,7 +18,9 @@
     "test:visualize": "tsx tests/visualize.ts",
     "test:benchmark-and-visualize": "tsx tests/benchmark.ts && tsx tests/visualize.ts",
     "test:medagentbench": "tsx tests/medagentbench.ts",
-    "test:medagentbench-visualize": "tsx tests/visualize.ts -- --medagentbench"
+    "test:medagentbench-visualize": "tsx tests/visualize.ts -- --medagentbench",
+    "test:medxpertqa": "tsx tests/medxpertqa.ts",
+    "test:medxpertqa-visualize": "tsx tests/visualize.ts -- --medxpertqa"
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",

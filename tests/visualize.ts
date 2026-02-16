@@ -16,6 +16,21 @@ interface BenchmarkResult {
   errorCount: number;
 }
 
+interface MedXpertQAResult {
+  timestamp: string;
+  config: { model?: string; sampleCount: number; concurrency: number };
+  thresholds: Record<string, number>;
+  metrics: Record<string, number>;
+  correctCount: number;
+  totalCount: number;
+  errorCount: number;
+  breakdowns: {
+    byTask: Record<string, { accuracy: number; count: number }>;
+    byType: Record<string, { accuracy: number; count: number }>;
+    bySystem: Record<string, { accuracy: number; count: number }>;
+  };
+}
+
 interface MedAgentBenchResult {
   timestamp: string;
   config: { model?: string; taskCount: number; concurrency: number; maxRounds: number };
@@ -113,6 +128,58 @@ const MEDAGENT_CATEGORIES: Record<string, string[]> = {
     'medagent_referral_order',
     'medagent_conditional_electrolyte',
     'medagent_conditional_lab',
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// MedXpertQA configuration
+// ---------------------------------------------------------------------------
+
+const MEDXPERT_METRIC_LABELS: Record<string, string> = {
+  medxpert_overall: 'Overall',
+  medxpert_basic_science: 'Basic Science',
+  medxpert_diagnosis: 'Diagnosis',
+  medxpert_treatment: 'Treatment',
+  medxpert_reasoning: 'Reasoning',
+  medxpert_understanding: 'Understanding',
+  medxpert_skeletal: 'Skeletal',
+  medxpert_cardiovascular: 'Cardiovascular',
+  medxpert_respiratory: 'Respiratory',
+  medxpert_nervous: 'Nervous',
+  medxpert_digestive: 'Digestive',
+  medxpert_reproductive: 'Reproductive',
+  medxpert_muscular: 'Muscular',
+  medxpert_endocrine: 'Endocrine',
+  medxpert_lymphatic: 'Lymphatic',
+  medxpert_integumentary: 'Integumentary',
+  medxpert_urinary: 'Urinary',
+  medxpert_other: 'Other',
+};
+
+const MEDXPERT_CATEGORIES: Record<string, string[]> = {
+  'Overall & Task Type': [
+    'medxpert_overall',
+    'medxpert_basic_science',
+    'medxpert_diagnosis',
+    'medxpert_treatment',
+  ],
+  'Question Type': [
+    'medxpert_reasoning',
+    'medxpert_understanding',
+  ],
+  'Body Systems': [
+    'medxpert_skeletal',
+    'medxpert_cardiovascular',
+    'medxpert_respiratory',
+    'medxpert_nervous',
+    'medxpert_digestive',
+    'medxpert_reproductive',
+    'medxpert_muscular',
+    'medxpert_endocrine',
+    'medxpert_lymphatic',
+    'medxpert_integumentary',
+    'medxpert_urinary',
+    'medxpert_other',
   ],
 };
 
@@ -893,13 +960,391 @@ function generateMedAgentBenchHTML(results: MedAgentBenchResult[]): string {
 }
 
 // ---------------------------------------------------------------------------
+// MedXpertQA results loading
+// ---------------------------------------------------------------------------
+
+function loadMedXpertQAResults(): MedXpertQAResult[] {
+  const args = process.argv.slice(2);
+  const compareAll = args.includes('--compare');
+  const specificFiles = args.filter(a => a.endsWith('.json'));
+
+  if (!existsSync(RESULTS_DIR)) {
+    console.error('No results directory found. Run `npm run test:medxpertqa` first.');
+    process.exit(1);
+  }
+
+  const allFiles = readdirSync(RESULTS_DIR)
+    .filter(f => f.startsWith('medxpertqa-') && f.endsWith('.json'))
+    .sort();
+
+  if (allFiles.length === 0) {
+    console.error('No MedXpertQA results found. Run `npm run test:medxpertqa` first.');
+    process.exit(1);
+  }
+
+  let filesToLoad: string[];
+  if (specificFiles.length > 0) {
+    filesToLoad = specificFiles.map(f => f.includes('/') ? f : join(RESULTS_DIR, f));
+  } else if (compareAll) {
+    filesToLoad = allFiles.slice(-5).map(f => join(RESULTS_DIR, f));
+  } else {
+    filesToLoad = [join(RESULTS_DIR, allFiles[allFiles.length - 1])];
+  }
+
+  return filesToLoad.map(f => JSON.parse(readFileSync(f, 'utf-8')) as MedXpertQAResult);
+}
+
+// ---------------------------------------------------------------------------
+// MedXpertQA HTML generation
+// ---------------------------------------------------------------------------
+
+function generateMedXpertQAHTML(results: MedXpertQAResult[]): string {
+  const isComparison = results.length > 1;
+  const latest = results[results.length - 1];
+  const thresholds = latest.thresholds;
+
+  const RUN_COLORS = [
+    { bg: 'rgba(59, 130, 246, 0.75)', border: 'rgb(59, 130, 246)' },
+    { bg: 'rgba(16, 185, 129, 0.75)', border: 'rgb(16, 185, 129)' },
+    { bg: 'rgba(245, 158, 11, 0.75)', border: 'rgb(245, 158, 11)' },
+    { bg: 'rgba(139, 92, 246, 0.75)', border: 'rgb(139, 92, 246)' },
+    { bg: 'rgba(239, 68, 68, 0.75)', border: 'rgb(239, 68, 68)' },
+  ];
+
+  const CATEGORY_COLORS: Record<string, { bg: string; border: string }> = {
+    'Overall & Task Type': { bg: 'rgba(59, 130, 246, 0.75)', border: 'rgb(59, 130, 246)' },
+    'Question Type': { bg: 'rgba(16, 185, 129, 0.75)', border: 'rgb(16, 185, 129)' },
+    'Body Systems': { bg: 'rgba(245, 158, 11, 0.75)', border: 'rgb(245, 158, 11)' },
+  };
+
+  const chartConfigs: string[] = [];
+  let chartIndex = 0;
+
+  for (const [category, metricKeys] of Object.entries(MEDXPERT_CATEGORIES)) {
+    // Only include metrics that exist in the results
+    const availableKeys = metricKeys.filter(k => latest.metrics[k] !== undefined);
+    if (availableKeys.length === 0) continue;
+
+    const labels = availableKeys.map(k => MEDXPERT_METRIC_LABELS[k] || k);
+    const canvasId = `chart-${chartIndex}`;
+
+    let datasets: string;
+    if (isComparison) {
+      datasets = results.map((r, ri) => {
+        const color = RUN_COLORS[ri % RUN_COLORS.length];
+        const data = availableKeys.map(k => (r.metrics[k] ?? 0).toFixed(4));
+        const model = r.config.model || 'claude-sonnet-4-5';
+        const shortModel = model.replace('claude-', '').replace(/-\d{8}$/, '');
+        const date = new Date(r.timestamp);
+        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        return `{
+          label: ${JSON.stringify(`${shortModel} (${dateStr})`)},
+          data: [${data.join(',')}],
+          backgroundColor: '${color.bg}',
+          borderColor: '${color.border}',
+          borderWidth: 1.5,
+          borderRadius: 4,
+        }`;
+      }).join(',\n          ');
+    } else {
+      const r = results[0];
+      const bgColors = availableKeys.map(k => {
+        const val = r.metrics[k] ?? 0;
+        const thresh = thresholds[k];
+        if (thresh !== undefined) {
+          return val >= thresh ? "'rgba(16, 185, 129, 0.75)'" : "'rgba(239, 68, 68, 0.75)'";
+        }
+        const catColor = CATEGORY_COLORS[category];
+        return `'${catColor?.bg || 'rgba(59, 130, 246, 0.75)'}'`;
+      });
+      const borderColors = availableKeys.map(k => {
+        const val = r.metrics[k] ?? 0;
+        const thresh = thresholds[k];
+        if (thresh !== undefined) {
+          return val >= thresh ? "'rgb(16, 185, 129)'" : "'rgb(239, 68, 68)'";
+        }
+        const catColor = CATEGORY_COLORS[category];
+        return `'${catColor?.border || 'rgb(59, 130, 246)'}'`;
+      });
+      const data = availableKeys.map(k => (r.metrics[k] ?? 0).toFixed(4));
+      const model = r.config.model || 'claude-sonnet-4-5';
+      const shortModel = model.replace('claude-', '').replace(/-\d{8}$/, '');
+      datasets = `{
+          label: ${JSON.stringify(shortModel)},
+          data: [${data.join(',')}],
+          backgroundColor: [${bgColors.join(',')}],
+          borderColor: [${borderColors.join(',')}],
+          borderWidth: 1.5,
+          borderRadius: 4,
+        }`;
+    }
+
+    // Threshold markers
+    const thresholdDataPoints = availableKeys.map(k =>
+      thresholds[k] !== undefined ? thresholds[k].toString() : 'null'
+    );
+    const hasThresholds = availableKeys.some(k => thresholds[k] !== undefined);
+
+    if (hasThresholds) {
+      datasets += `,{
+          label: 'Threshold',
+          data: [${thresholdDataPoints.join(',')}],
+          type: 'line',
+          borderColor: 'rgba(239, 68, 68, 0.7)',
+          borderWidth: 2,
+          borderDash: [6, 4],
+          pointBackgroundColor: 'rgba(239, 68, 68, 0.9)',
+          pointRadius: 5,
+          pointStyle: 'crossRot',
+          fill: false,
+          order: 0,
+          spanGaps: true,
+        }`;
+    }
+
+    chartConfigs.push(`
+      new Chart(document.getElementById('${canvasId}'), {
+        type: 'bar',
+        data: {
+          labels: ${JSON.stringify(labels)},
+          datasets: [${datasets}]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 1,
+              ticks: {
+                callback: v => (v * 100).toFixed(0) + '%',
+                font: { size: 12 },
+              },
+              grid: { color: 'rgba(0,0,0,0.06)' },
+            },
+            x: {
+              ticks: { font: { size: 12, weight: '500' } },
+              grid: { display: false },
+            }
+          },
+          plugins: {
+            legend: { display: ${isComparison || hasThresholds}, position: 'top' },
+            title: {
+              display: true,
+              text: '${category}',
+              font: { size: 18, weight: '600' },
+              padding: { bottom: 16 },
+            },
+            tooltip: {
+              callbacks: {
+                label: ctx => ctx.dataset.label + ': ' + (ctx.raw * 100).toFixed(1) + '%',
+              }
+            },
+          },
+        }
+      });
+    `);
+    chartIndex++;
+  }
+
+  const overallAcc = (latest.metrics.medxpert_overall * 100).toFixed(1);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MedXpertQA — Expert Medical Reasoning Benchmark</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      padding: 2rem;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .subtitle { color: #64748b; font-size: 0.9rem; margin-bottom: 2rem; }
+    .stats-row { display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
+    .stat-card {
+      background: white; border-radius: 12px; padding: 1.25rem 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08); min-width: 140px; flex: 1;
+    }
+    .stat-card .label { font-size: 0.8rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-card .value { font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; }
+    .stat-card .value.pass { color: #10b981; }
+    .stat-card .value.fail { color: #ef4444; }
+    .stat-card .value.neutral { color: #3b82f6; }
+    .chart-card {
+      background: white; border-radius: 12px; padding: 1.5rem;
+      margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .chart-container { position: relative; height: 360px; }
+    .metric-table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.875rem; }
+    .metric-table th {
+      text-align: left; padding: 0.625rem 1rem; background: #f1f5f9;
+      font-weight: 600; border-bottom: 2px solid #e2e8f0;
+    }
+    .metric-table td { padding: 0.5rem 1rem; border-bottom: 1px solid #f1f5f9; }
+    .metric-table tr:hover td { background: #f8fafc; }
+    .badge { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    .badge.pass { background: #d1fae5; color: #065f46; }
+    .badge.fail { background: #fee2e2; color: #991b1b; }
+    .badge.none { background: #f1f5f9; color: #64748b; }
+    .reference-card {
+      background: white; border-radius: 12px; padding: 1.5rem;
+      margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .reference-card h2 { font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem; }
+    .reference-row { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #f1f5f9; }
+    .reference-row:last-child { border: none; }
+    .reference-row .model { font-weight: 500; }
+    .reference-row .score { font-weight: 700; }
+    .reference-row .score.highlight { color: #3b82f6; }
+    footer { margin-top: 2rem; text-align: center; color: #94a3b8; font-size: 0.8rem; }
+    .rerun-hint {
+      margin-top: 1rem; padding: 1rem; background: #eff6ff;
+      border-radius: 8px; font-size: 0.85rem; color: #1e40af;
+    }
+    .rerun-hint code {
+      background: #dbeafe; padding: 0.125rem 0.375rem;
+      border-radius: 4px; font-family: 'SF Mono', Menlo, monospace; font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>MedXpertQA — Expert Medical Reasoning Benchmark</h1>
+    <p class="subtitle">
+      Model: ${latest.config.model || 'claude-sonnet-4-5-20250929'}
+      &middot; ${new Date(latest.timestamp).toLocaleString()}
+      &middot; ${latest.totalCount} questions evaluated
+    </p>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="label">Overall Accuracy</div>
+        <div class="value ${latest.metrics.medxpert_overall >= 0.5 ? 'pass' : 'fail'}">${overallAcc}%</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Correct</div>
+        <div class="value pass">${latest.correctCount} / ${latest.totalCount}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Errors</div>
+        <div class="value ${latest.errorCount > 0 ? 'fail' : 'pass'}">${latest.errorCount}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">10-Option MCQ</div>
+        <div class="value neutral">A\u2013J</div>
+      </div>
+    </div>
+
+    ${Array.from({ length: chartIndex }, (_, i) => `
+    <div class="chart-card">
+      <div class="chart-container">
+        <canvas id="chart-${i}"></canvas>
+      </div>
+    </div>`).join('\n')}
+
+    <div class="reference-card">
+      <h2>Published Reference Results (MedXpertQA, ICML 2025)</h2>
+      <div class="reference-row">
+        <span class="model">GPT-4o</span>
+        <span class="score">56.2%</span>
+      </div>
+      <div class="reference-row">
+        <span class="model">Claude 3.5</span>
+        <span class="score">53.8%</span>
+      </div>
+      <div class="reference-row">
+        <span class="model">Med-Gemini</span>
+        <span class="score">52.0%</span>
+      </div>
+      <div class="reference-row">
+        <span class="model">This run (${latest.config.model || 'claude-sonnet-4-5-20250929'})</span>
+        <span class="score highlight">${overallAcc}%</span>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">All Metrics</h2>
+      <table class="metric-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Category</th>
+            <th>Score</th>
+            <th>Threshold</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${Object.entries(MEDXPERT_CATEGORIES).flatMap(([cat, keys]) =>
+            keys.filter(k => latest.metrics[k] !== undefined).map(k => {
+              const val = latest.metrics[k] ?? 0;
+              const thresh = thresholds[k];
+              const pass = thresh === undefined ? null : val >= thresh;
+              const badge = pass === null ? '<span class="badge none">N/A</span>'
+                : pass ? '<span class="badge pass">PASS</span>'
+                : '<span class="badge fail">FAIL</span>';
+              return `<tr>
+                <td><strong>${MEDXPERT_METRIC_LABELS[k] || k}</strong></td>
+                <td>${cat}</td>
+                <td>${(val * 100).toFixed(1)}%</td>
+                <td>${thresh !== undefined ? (thresh * 100).toFixed(0) + '%' : '\u2014'}</td>
+                <td>${badge}</td>
+              </tr>`;
+            })
+          ).join('\n          ')}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rerun-hint">
+      <strong>Rerun MedXpertQA:</strong><br>
+      <code>npm run test:medxpertqa</code> — full run (~2,460 questions)<br>
+      <code>MEDXPERT_SAMPLES=10 npm run test:medxpertqa</code> — quick run with fewer questions<br>
+      <code>npm run test:medxpertqa-visualize</code> — regenerate this chart<br>
+      <code>npm run test:medxpertqa-visualize -- --compare</code> — compare last 5 runs
+    </div>
+
+    <footer>
+      Generated ${new Date().toLocaleString()} &middot; MedXpertQA (Tsinghua C3I, ICML 2025)
+    </footer>
+  </div>
+
+  <script>
+    ${chartConfigs.join('\n')}
+  </script>
+</body>
+</html>`;
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
 const args = process.argv.slice(2);
+const isMedXpertQA = args.includes('--medxpertqa');
 const isMedAgentBench = args.includes('--medagentbench');
 
-if (isMedAgentBench) {
+if (isMedXpertQA) {
+  const mxResults = loadMedXpertQAResults();
+  const html = generateMedXpertQAHTML(mxResults);
+  const outputPath = join(RESULTS_DIR, 'medxpertqa-chart.html');
+  writeFileSync(outputPath, html);
+  console.log(`MedXpertQA chart saved to ${outputPath}`);
+  try {
+    if (process.platform === 'darwin') execSync(`open "${outputPath}"`);
+    else if (process.platform === 'linux') execSync(`xdg-open "${outputPath}"`);
+    else if (process.platform === 'win32') execSync(`start "" "${outputPath}"`);
+  } catch {
+    console.log('Could not auto-open browser. Open the file manually.');
+  }
+} else if (isMedAgentBench) {
   const maResults = loadMedAgentBenchResults();
   const html = generateMedAgentBenchHTML(maResults);
   const outputPath = join(RESULTS_DIR, 'medagentbench-chart.html');

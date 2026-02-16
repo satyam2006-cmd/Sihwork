@@ -1,0 +1,229 @@
+{
+  "timestamp": "2026-02-16T00:26:17.207Z",
+  "config": {
+    "model": "claude-opus-4-6",
+    "sampleCount": 15,
+    "concurrency": 5
+  },
+  "thresholds": {
+    "overall": 0.5,
+    "reasoning": 0.45,
+    "understanding": 0.55
+  },
+  "metrics": {
+    "medxpert_overall": 0.5333333333333333,
+    "medxpert_basic_science": 0.3333333333333333,
+    "medxpert_diagnosis": 0.375,
+    "medxpert_treatment": 1,
+    "medxpert_reasoning": 0.5384615384615384,
+    "medxpert_understanding": 0.5,
+    "medxpert_skeletal": 0,
+    "medxpert_muscular": 0,
+    "medxpert_respiratory": 0.3333333333333333,
+    "medxpert_endocrine": 1,
+    "medxpert_cardiovascular": 0.5,
+    "medxpert_lymphatic": 1,
+    "medxpert_nervous": 1,
+    "medxpert_reproductive": 0
+  },
+  "correctCount": 8,
+  "totalCount": 15,
+  "errorCount": 0,
+  "breakdowns": {
+    "byTask": {
+      "Basic Science": {
+        "accuracy": 0.3333333333333333,
+        "count": 3
+      },
+      "Diagnosis": {
+        "accuracy": 0.375,
+        "count": 8
+      },
+      "Treatment": {
+        "accuracy": 1,
+        "count": 4
+      }
+    },
+    "byType": {
+      "Reasoning": {
+        "accuracy": 0.5384615384615384,
+        "count": 13
+      },
+      "Understanding": {
+        "accuracy": 0.5,
+        "count": 2
+      }
+    },
+    "bySystem": {
+      "Skeletal": {
+        "accuracy": 0,
+        "count": 2
+      },
+      "Muscular": {
+        "accuracy": 0,
+        "count": 1
+      },
+      "Respiratory": {
+        "accuracy": 0.3333333333333333,
+        "count": 3
+      },
+      "Endocrine": {
+        "accuracy": 1,
+        "count": 3
+      },
+      "Cardiovascular": {
+        "accuracy": 0.5,
+        "count": 2
+      },
+      "Lymphatic": {
+        "accuracy": 1,
+        "count": 1
+      },
+      "Nervous": {
+        "accuracy": 1,
+        "count": 2
+      },
+      "Reproductive": {
+        "accuracy": 0,
+        "count": 1
+      }
+    }
+  },
+  "results": [
+    {
+      "id": "Text-0",
+      "correct": false,
+      "predicted": "A",
+      "expected": "E",
+      "medical_task": "Basic Science",
+      "body_system": "Skeletal",
+      "question_type": "Reasoning"
+    },
+    {
+      "id": "Text-1",
+      "correct": false,
+      "predicted": "F",
+      "expected": "E",
+      "medical_task": "Diagnosis",
+      "body_system": "Muscular",
+      "question_type": "Reasoning"
+    },
+    {
+      "id": "Text-2",
+      "correct": true,
+      "predicted": "C",
+      "expected": "C",
+      "medical_task": "Diagnosis",
+      "body_system": "Respiratory",
+      "question_type": "Reasoning"
+    },
+    {
+      "id": "Text-3",
+      "correct": true,
+      "predicted": "I",
+      "expected": "I",
+      "medical_task": "Treatment",
+      "body_system": "Endocrine",
+      "question_type": "Reasoning"
+    },
+    {
+      "id": "Text-4",
+      "correct": false,
+      "predicted": "B",
+      "expected": "J",
+      "medical_task": "Diagnosis",
+      "body_system": "Cardiovascular",
+      "question_type": "Reasoning"
+    },
+    {
+      "id": "Text-5",
+      "correct": true,
+      "predicted": "C",
+      "expected": "C",
+      "medical_task": "Treatment",
+      "body_system": "Lymphatic",
+      "question_type": "Reasoning"
+    },
+    {
+      "id": "Text-6",
+      "correct": true,
+      "predicted": "H",
+      "expected": "H",
+      "medical_task": "Treatment",
+      "body_system": "Nervous",
+      "question_type": "Understanding"
+    },
+    {
+      "id": "Text-7",
+      "correct": true,
+      "predicted": "F",
+      "expected": "F",
+      "medical_task": "Basic Science",
+      "body_system": "Nervous",
+      "question_type": "Reasoning"
+    },
+    {
+      "id": "Text-8",
+      "correct": true,
+      "predicted": "H",
+      "expected": "H",
+      "medical_task": "Diagnosis",
+      "body_system": "Cardiovascular",
+      "question_type": "Reasoning"
+    },
+    {
+      "id": "Text-9",
+      "correct": false,
+      "predicted": "G",
+      "expected": "B",
+      "medical_task": "Diagnosis",
+      "body_system": "Reproductive",
+      "question_type": "Reasoning"
+    },
+    {
+      "id": "Text-10",
+      "correct": true,
+      "predicted": "D",
+      "expected": "D",
+      "medical_task": "Treatment",
+      "body_system": "Endocrine",
+      "question_type": "Reasoning"
+    },
+    {
+      "id": "Text-11",
+      "correct": false,
+      "predicted": "B",
+      "expected": "E",
+      "medical_task": "Diagnosis",
+      "body_system": "Respiratory",
+      "question_type": "Reasoning"
+    },
+    {
+      "id": "Text-12",
+      "correct": false,
+      "predicted": "D",
+      "expected": "B",
+      "medical_task": "Diagnosis",
+      "body_system": "Respiratory",
+      "question_type": "Reasoning"
+    },
+    {
+      "id": "Text-13",
+      "correct": false,
+      "predicted": "B",
+      "expected": "I",
+      "medical_task": "Basic Science",
+      "body_system": "Skeletal",
+      "question_type": "Understanding"
+    },
+    {
+      "id": "Text-14",
+      "correct": true,
+      "predicted": "D",
+      "expected": "D",
+      "medical_task": "Diagnosis",
+      "body_system": "Endocrine",
+      "question_type": "Reasoning"
+    }
+  ]
+}

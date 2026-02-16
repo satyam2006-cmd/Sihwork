@@ -1,0 +1,119 @@
+{
+  "timestamp": "2026-02-15T23:52:40.933Z",
+  "config": {
+    "model": "claude-sonnet-4-5-20250929",
+    "sampleCount": 5,
+    "concurrency": 5
+  },
+  "thresholds": {
+    "overall": 0.5,
+    "reasoning": 0.45,
+    "understanding": 0.55
+  },
+  "metrics": {
+    "medxpert_overall": 0.2,
+    "medxpert_basic_science": 0,
+    "medxpert_diagnosis": 0,
+    "medxpert_treatment": 1,
+    "medxpert_reasoning": 0.2,
+    "medxpert_skeletal": 0,
+    "medxpert_muscular": 0,
+    "medxpert_respiratory": 0,
+    "medxpert_endocrine": 1,
+    "medxpert_cardiovascular": 0
+  },
+  "correctCount": 1,
+  "totalCount": 5,
+  "errorCount": 0,
+  "breakdowns": {
+    "byTask": {
+      "Basic Science": {
+        "accuracy": 0,
+        "count": 1
+      },
+      "Diagnosis": {
+        "accuracy": 0,
+        "count": 3
+      },
+      "Treatment": {
+        "accuracy": 1,
+        "count": 1
+      }
+    },
+    "byType": {
+      "Reasoning": {
+        "accuracy": 0.2,
+        "count": 5
+      }
+    },
+    "bySystem": {
+      "Skeletal": {
+        "accuracy": 0,
+        "count": 1
+      },
+      "Muscular": {
+        "accuracy": 0,
+        "count": 1
+      },
+      "Respiratory": {
+        "accuracy": 0,
+        "count": 1
+      },
+      "Endocrine": {
+        "accuracy": 1,
+        "count": 1
+      },
+      "Cardiovascular": {
+        "accuracy": 0,
+        "count": 1
+      }
+    }
+  },
+  "results": [
+    {
+      "id": "Text-0",
+      "correct": false,
+      "predicted": "C",
+      "expected": "E",
+      "medical_task": "Basic Science",
+      "body_system": "Skeletal",
+      "question_type": "Reasoning"
+    },
+    {
+      "id": "Text-1",
+      "correct": false,
+      "predicted": "D",
+      "expected": "E",
+      "medical_task": "Diagnosis",
+      "body_system": "Muscular",
+      "question_type": "Reasoning"
+    },
+    {
+      "id": "Text-2",
+      "correct": false,
+      "predicted": "J",
+      "expected": "C",
+      "medical_task": "Diagnosis",
+      "body_system": "Respiratory",
+      "question_type": "Reasoning"
+    },
+    {
+      "id": "Text-3",
+      "correct": true,
+      "predicted": "I",
+      "expected": "I",
+      "medical_task": "Treatment",
+      "body_system": "Endocrine",
+      "question_type": "Reasoning"
+    },
+    {
+      "id": "Text-4",
+      "correct": false,
+      "predicted": "B",
+      "expected": "J",
+      "medical_task": "Diagnosis",
+      "body_system": "Cardiovascular",
+      "question_type": "Reasoning"
+    }
+  ]
+}

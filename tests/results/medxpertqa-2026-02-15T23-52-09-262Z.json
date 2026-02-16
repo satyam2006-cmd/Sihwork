@@ -1,0 +1,61 @@
+{
+  "timestamp": "2026-02-15T23:52:09.262Z",
+  "config": {
+    "model": "claude-sonnet-4-5-20250929",
+    "sampleCount": 2,
+    "concurrency": 5
+  },
+  "thresholds": {
+    "overall": 0.5,
+    "reasoning": 0.45,
+    "understanding": 0.55
+  },
+  "metrics": {
+    "medxpert_overall": 0,
+    "medxpert_unknown": 0,
+    "medxpert_other": 0
+  },
+  "correctCount": 0,
+  "totalCount": 2,
+  "errorCount": 0,
+  "breakdowns": {
+    "byTask": {
+      "Unknown": {
+        "accuracy": 0,
+        "count": 2
+      }
+    },
+    "byType": {
+      "Unknown": {
+        "accuracy": 0,
+        "count": 2
+      }
+    },
+    "bySystem": {
+      "Other": {
+        "accuracy": 0,
+        "count": 2
+      }
+    }
+  },
+  "results": [
+    {
+      "id": "Text-0",
+      "correct": false,
+      "predicted": "I",
+      "expected": "",
+      "medical_task": "",
+      "body_system": "",
+      "question_type": ""
+    },
+    {
+      "id": "Text-1",
+      "correct": false,
+      "predicted": null,
+      "expected": "",
+      "medical_task": "",
+      "body_system": "",
+      "question_type": ""
+    }
+  ]
+}
