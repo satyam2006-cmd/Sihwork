@@ -10,9 +10,10 @@ const ASR_TIMEOUT_MS = 15_000;
 export async function speechToText(audioBuffer: Buffer, mimeType: string = 'audio/webm'): Promise<ASRResult> {
   const config = getSarvamConfig();
 
-  const ext = mimeTypeToExtension(mimeType);
+  const baseMime = mimeType.split(';')[0].trim();
+  const ext = mimeTypeToExtension(baseMime);
   const formData = new FormData();
-  const audioBlob = new Blob([new Uint8Array(audioBuffer) as BlobPart], { type: mimeType });
+  const audioBlob = new Blob([new Uint8Array(audioBuffer) as BlobPart], { type: baseMime });
   formData.append('file', audioBlob, `audio${ext}`);
   formData.append('model', 'saaras:v3');
   formData.append('language_code', 'unknown');

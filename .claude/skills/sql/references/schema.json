@@ -1,237 +1,297 @@
 {
-  "database": "supabase_example",
-  "description": "Example database schema for Second Opinion AI project",
+  "database": "second_opinion_ai",
+  "description": "Virtual Hospital / Second Opinion AI - Supabase PostgreSQL database",
+  "notes": [
+    "All tables use uuid primary keys via gen_random_uuid().",
+    "All timestamps are timestamptz (UTC with time zone).",
+    "Row Level Security (RLS) is enabled on all tables.",
+    "MCP tools use a service-role client that bypasses RLS.",
+    "auth.users is managed by Supabase Auth (not listed here).",
+    "Schema derived from migrations 001-005."
+  ],
   "tables": {
-    "users": {
-      "description": "User accounts and profiles",
-      "primary_key": "id",
-      "columns": {
-        "id": {
-          "type": "uuid",
-          "nullable": false,
-          "description": "Unique user identifier"
-        },
-        "email": {
-          "type": "varchar(255)",
-          "nullable": false,
-          "description": "User email address"
-        },
-        "name": {
-          "type": "varchar(255)",
-          "nullable": true,
-          "description": "User full name"
-        },
-        "created_at": {
-          "type": "timestamp with time zone",
-          "nullable": false,
-          "description": "Account creation timestamp"
-        },
-        "updated_at": {
-          "type": "timestamp with time zone",
-          "nullable": false,
-          "description": "Last update timestamp"
-        },
-        "status": {
-          "type": "varchar(50)",
-          "nullable": false,
-          "description": "Account status (active, inactive, suspended)"
-        }
-      },
-      "indexes": [
-        {
-          "name": "idx_users_email",
-          "columns": ["email"],
-          "unique": true
-        },
-        {
-          "name": "idx_users_created_at",
-          "columns": ["created_at"]
-        }
-      ]
-    },
-    "opinions": {
-      "description": "Medical second opinions requested by users",
+    "patients": {
+      "description": "Patient profiles linked to Supabase Auth users",
       "primary_key": "id",
       "foreign_keys": {
-        "user_id": "users.id"
+        "user_id": "auth.users.id"
       },
       "columns": {
-        "id": {
-          "type": "uuid",
-          "nullable": false,
-          "description": "Unique opinion identifier"
-        },
-        "user_id": {
-          "type": "uuid",
-          "nullable": false,
-          "description": "ID of user who requested opinion"
-        },
-        "title": {
-          "type": "varchar(500)",
-          "nullable": false,
-          "description": "Brief title of the case"
-        },
-        "description": {
-          "type": "text",
-          "nullable": false,
-          "description": "Detailed case description"
-        },
-        "status": {
-          "type": "varchar(50)",
-          "nullable": false,
-          "description": "Opinion status (pending, in_review, completed, cancelled)"
-        },
-        "created_at": {
-          "type": "timestamp with time zone",
-          "nullable": false,
-          "description": "Request creation timestamp"
-        },
-        "completed_at": {
-          "type": "timestamp with time zone",
-          "nullable": true,
-          "description": "Completion timestamp"
-        },
-        "priority": {
-          "type": "varchar(20)",
-          "nullable": false,
-          "description": "Priority level (low, medium, high, urgent)"
-        }
+        "id": { "type": "uuid", "nullable": false, "default": "gen_random_uuid()" },
+        "user_id": { "type": "uuid", "nullable": false, "description": "Supabase Auth user ID" },
+        "full_name": { "type": "text", "nullable": false },
+        "date_of_birth": { "type": "date", "nullable": true },
+        "gender": { "type": "text", "nullable": true },
+        "phone": { "type": "text", "nullable": true },
+        "blood_type": { "type": "text", "nullable": true },
+        "allergies": { "type": "jsonb", "nullable": false, "default": "[]" },
+        "chronic_conditions": { "type": "jsonb", "nullable": false, "default": "[]" },
+        "current_medications": { "type": "jsonb", "nullable": false, "default": "[]" },
+        "emergency_contact": { "type": "jsonb", "nullable": true },
+        "created_at": { "type": "timestamptz", "nullable": false, "default": "now()" },
+        "updated_at": { "type": "timestamptz", "nullable": false, "default": "now()", "description": "Auto-updated via trigger" }
       },
+      "constraints": [
+        { "name": "patients_user_id_unique", "type": "unique", "columns": ["user_id"] }
+      ],
       "indexes": [
-        {
-          "name": "idx_opinions_user_id",
-          "columns": ["user_id"]
-        },
-        {
-          "name": "idx_opinions_status",
-          "columns": ["status"]
-        },
-        {
-          "name": "idx_opinions_created_at",
-          "columns": ["created_at"]
-        }
+        { "name": "idx_patients_user_id", "columns": ["user_id"] }
+      ]
+    },
+    "doctors": {
+      "description": "Doctor profiles linked to Supabase Auth users",
+      "primary_key": "id",
+      "foreign_keys": {
+        "user_id": "auth.users.id"
+      },
+      "columns": {
+        "id": { "type": "uuid", "nullable": false, "default": "gen_random_uuid()" },
+        "user_id": { "type": "uuid", "nullable": false, "description": "Supabase Auth user ID" },
+        "full_name": { "type": "text", "nullable": false },
+        "specialization": { "type": "text", "nullable": true },
+        "created_at": { "type": "timestamptz", "nullable": false, "default": "now()" }
+      },
+      "constraints": [
+        { "name": "doctors_user_id_unique", "type": "unique", "columns": ["user_id"] }
+      ],
+      "indexes": [
+        { "name": "idx_doctors_user_id", "columns": ["user_id"] }
       ]
     },
     "documents": {
-      "description": "Medical documents uploaded for opinions",
+      "description": "Medical documents (PDFs) uploaded by patients",
       "primary_key": "id",
       "foreign_keys": {
-        "opinion_id": "opinions.id",
-        "uploaded_by": "users.id"
+        "patient_id": "patients.id"
       },
       "columns": {
-        "id": {
-          "type": "uuid",
-          "nullable": false,
-          "description": "Unique document identifier"
-        },
-        "opinion_id": {
-          "type": "uuid",
-          "nullable": false,
-          "description": "Associated opinion ID"
-        },
-        "uploaded_by": {
-          "type": "uuid",
-          "nullable": false,
-          "description": "User who uploaded the document"
-        },
-        "file_name": {
-          "type": "varchar(500)",
-          "nullable": false,
-          "description": "Original file name"
-        },
-        "file_path": {
-          "type": "varchar(1000)",
-          "nullable": false,
-          "description": "Storage path/URL"
-        },
-        "file_size": {
-          "type": "bigint",
-          "nullable": false,
-          "description": "File size in bytes"
-        },
-        "mime_type": {
-          "type": "varchar(100)",
-          "nullable": false,
-          "description": "File MIME type"
-        },
-        "uploaded_at": {
-          "type": "timestamp with time zone",
-          "nullable": false,
-          "description": "Upload timestamp"
-        }
+        "id": { "type": "uuid", "nullable": false, "default": "gen_random_uuid()" },
+        "patient_id": { "type": "uuid", "nullable": false },
+        "file_name": { "type": "text", "nullable": false },
+        "file_path": { "type": "text", "nullable": false },
+        "file_size": { "type": "integer", "nullable": false },
+        "mime_type": { "type": "text", "nullable": false },
+        "status": { "type": "text", "nullable": false, "default": "uploaded", "check": "('uploaded','processing','processed','failed')" },
+        "extracted_data": { "type": "jsonb", "nullable": true, "description": "Full structured data extracted from document" },
+        "extraction_error": { "type": "text", "nullable": true },
+        "extracted_summary": { "type": "text", "nullable": true, "description": "Compact text summary of document (added in migration 002)" },
+        "uploaded_at": { "type": "timestamptz", "nullable": false, "default": "now()" },
+        "processed_at": { "type": "timestamptz", "nullable": true }
       },
       "indexes": [
-        {
-          "name": "idx_documents_opinion_id",
-          "columns": ["opinion_id"]
-        },
-        {
-          "name": "idx_documents_uploaded_by",
-          "columns": ["uploaded_by"]
-        }
+        { "name": "idx_documents_patient_id", "columns": ["patient_id"] }
       ]
     },
-    "reviews": {
-      "description": "Expert reviews of second opinion requests",
+    "sessions": {
+      "description": "Consultation sessions (text chat, voice call, or clinic scribe)",
       "primary_key": "id",
       "foreign_keys": {
-        "opinion_id": "opinions.id",
-        "reviewer_id": "users.id"
+        "patient_id": "patients.id",
+        "doctor_id": "doctors.id"
       },
       "columns": {
-        "id": {
-          "type": "uuid",
-          "nullable": false,
-          "description": "Unique review identifier"
-        },
-        "opinion_id": {
-          "type": "uuid",
-          "nullable": false,
-          "description": "Opinion being reviewed"
-        },
-        "reviewer_id": {
-          "type": "uuid",
-          "nullable": false,
-          "description": "Expert reviewer user ID"
-        },
-        "content": {
-          "type": "text",
-          "nullable": false,
-          "description": "Review content and findings"
-        },
-        "recommendation": {
-          "type": "text",
-          "nullable": true,
-          "description": "Expert recommendations"
-        },
-        "created_at": {
-          "type": "timestamp with time zone",
-          "nullable": false,
-          "description": "Review creation timestamp"
-        },
-        "updated_at": {
-          "type": "timestamp with time zone",
-          "nullable": false,
-          "description": "Last update timestamp"
-        }
+        "id": { "type": "uuid", "nullable": false, "default": "gen_random_uuid()" },
+        "patient_id": { "type": "uuid", "nullable": false },
+        "status": { "type": "text", "nullable": false, "default": "active", "check": "('active','completed','abandoned')" },
+        "mode": { "type": "text", "nullable": false, "default": "text", "check": "('text','voice','scribe')" },
+        "language": { "type": "text", "nullable": false, "default": "en" },
+        "transcript": { "type": "jsonb", "nullable": false, "default": "[]", "description": "Array of {role, content, timestamp?} message objects" },
+        "emergency_flagged": { "type": "boolean", "nullable": false, "default": "false" },
+        "emergency_details": { "type": "text", "nullable": true },
+        "doctor_id": { "type": "uuid", "nullable": true, "description": "Set only for scribe sessions (added in migration 005)" },
+        "started_at": { "type": "timestamptz", "nullable": false, "default": "now()" },
+        "ended_at": { "type": "timestamptz", "nullable": true },
+        "metadata": { "type": "jsonb", "nullable": false, "default": "{}" }
       },
       "indexes": [
-        {
-          "name": "idx_reviews_opinion_id",
-          "columns": ["opinion_id"]
-        },
-        {
-          "name": "idx_reviews_reviewer_id",
-          "columns": ["reviewer_id"]
-        }
+        { "name": "idx_sessions_patient_id", "columns": ["patient_id"] },
+        { "name": "idx_sessions_doctor_id", "columns": ["doctor_id"] }
+      ]
+    },
+    "visit_records": {
+      "description": "Structured clinical visit records extracted from sessions",
+      "primary_key": "id",
+      "foreign_keys": {
+        "session_id": "sessions.id",
+        "patient_id": "patients.id"
+      },
+      "columns": {
+        "id": { "type": "uuid", "nullable": false, "default": "gen_random_uuid()" },
+        "session_id": { "type": "uuid", "nullable": false },
+        "patient_id": { "type": "uuid", "nullable": false },
+        "chief_complaint": { "type": "text", "nullable": true },
+        "symptoms": { "type": "jsonb", "nullable": false, "default": "[]" },
+        "vitals": { "type": "jsonb", "nullable": true },
+        "assessment": { "type": "text", "nullable": true },
+        "recommendations": { "type": "jsonb", "nullable": false, "default": "[]" },
+        "diagnoses": { "type": "jsonb", "nullable": false, "default": "[]" },
+        "follow_up": { "type": "text", "nullable": true },
+        "source": { "type": "text", "nullable": false, "default": "ai_extraction" },
+        "confidence_score": { "type": "double precision", "nullable": true },
+        "needs_review": { "type": "boolean", "nullable": false, "default": "false" },
+        "reviewed_by": { "type": "uuid", "nullable": true },
+        "reviewed_at": { "type": "timestamptz", "nullable": true },
+        "red_flags": { "type": "jsonb", "nullable": false, "default": "[]", "description": "Added in migration 003" },
+        "medication_changes": { "type": "jsonb", "nullable": false, "default": "[]", "description": "Added in migration 003" },
+        "created_at": { "type": "timestamptz", "nullable": false, "default": "now()" }
+      },
+      "indexes": [
+        { "name": "idx_visit_records_session", "columns": ["session_id"] },
+        { "name": "idx_visit_records_patient", "columns": ["patient_id"] }
+      ]
+    },
+    "session_summaries": {
+      "description": "AI-generated session summaries with key findings",
+      "primary_key": "id",
+      "foreign_keys": {
+        "session_id": "sessions.id",
+        "patient_id": "patients.id"
+      },
+      "columns": {
+        "id": { "type": "uuid", "nullable": false, "default": "gen_random_uuid()" },
+        "session_id": { "type": "uuid", "nullable": false },
+        "patient_id": { "type": "uuid", "nullable": false },
+        "summary_text": { "type": "text", "nullable": false },
+        "key_findings": { "type": "jsonb", "nullable": false, "default": "[]" },
+        "follow_up_items": { "type": "jsonb", "nullable": false, "default": "[]" },
+        "created_at": { "type": "timestamptz", "nullable": false, "default": "now()" }
+      },
+      "constraints": [
+        { "name": "session_summaries_session_id_unique", "type": "unique", "columns": ["session_id"] }
+      ],
+      "indexes": [
+        { "name": "idx_session_summaries_patient", "columns": ["patient_id"] }
+      ]
+    },
+    "soap_notes": {
+      "description": "SOAP notes generated by post-session agent (one per session)",
+      "primary_key": "id",
+      "foreign_keys": {
+        "session_id": "sessions.id",
+        "patient_id": "patients.id",
+        "edited_by": "auth.users.id"
+      },
+      "columns": {
+        "id": { "type": "uuid", "nullable": false, "default": "gen_random_uuid()" },
+        "session_id": { "type": "uuid", "nullable": false },
+        "patient_id": { "type": "uuid", "nullable": false },
+        "subjective": { "type": "text", "nullable": false },
+        "objective": { "type": "text", "nullable": false },
+        "assessment": { "type": "text", "nullable": false },
+        "plan": { "type": "text", "nullable": false },
+        "status": { "type": "text", "nullable": false, "default": "draft", "check": "('draft','edited','finalized')" },
+        "edited_by": { "type": "uuid", "nullable": true },
+        "edited_at": { "type": "timestamptz", "nullable": true },
+        "finalized_at": { "type": "timestamptz", "nullable": true },
+        "created_at": { "type": "timestamptz", "nullable": false, "default": "now()" },
+        "updated_at": { "type": "timestamptz", "nullable": false, "default": "now()", "description": "Auto-updated via trigger" }
+      },
+      "constraints": [
+        { "name": "soap_notes_session_id_unique", "type": "unique", "columns": ["session_id"] }
+      ],
+      "indexes": [
+        { "name": "idx_soap_notes_session", "columns": ["session_id"] },
+        { "name": "idx_soap_notes_patient", "columns": ["patient_id"] }
+      ]
+    },
+    "ehr_entries": {
+      "description": "Structured EHR entries generated by post-session agent (one per session)",
+      "primary_key": "id",
+      "foreign_keys": {
+        "session_id": "sessions.id",
+        "patient_id": "patients.id",
+        "edited_by": "auth.users.id"
+      },
+      "columns": {
+        "id": { "type": "uuid", "nullable": false, "default": "gen_random_uuid()" },
+        "session_id": { "type": "uuid", "nullable": false },
+        "patient_id": { "type": "uuid", "nullable": false },
+        "encounter_date": { "type": "date", "nullable": false, "default": "current_date" },
+        "encounter_type": { "type": "text", "nullable": false, "default": "virtual_consultation", "check": "('virtual_consultation','follow_up','urgent','emergency','in_person_visit')" },
+        "chief_complaint": { "type": "text", "nullable": false },
+        "history_of_present_illness": { "type": "text", "nullable": false },
+        "past_medical_history": { "type": "text", "nullable": true },
+        "review_of_systems": { "type": "jsonb", "nullable": true },
+        "physical_exam": { "type": "text", "nullable": true },
+        "assessment_and_plan": { "type": "text", "nullable": false },
+        "diagnoses_icd": { "type": "jsonb", "nullable": false, "default": "[]", "description": "Array of {code, description} ICD-10 objects" },
+        "procedures_cpt": { "type": "jsonb", "nullable": false, "default": "[]", "description": "Array of {code, description} CPT objects" },
+        "orders": { "type": "jsonb", "nullable": false, "default": "[]" },
+        "prescriptions": { "type": "jsonb", "nullable": false, "default": "[]" },
+        "follow_up_instructions": { "type": "text", "nullable": true },
+        "status": { "type": "text", "nullable": false, "default": "draft", "check": "('draft','edited','finalized')" },
+        "edited_by": { "type": "uuid", "nullable": true },
+        "edited_at": { "type": "timestamptz", "nullable": true },
+        "finalized_at": { "type": "timestamptz", "nullable": true },
+        "created_at": { "type": "timestamptz", "nullable": false, "default": "now()" },
+        "updated_at": { "type": "timestamptz", "nullable": false, "default": "now()", "description": "Auto-updated via trigger" }
+      },
+      "constraints": [
+        { "name": "ehr_entries_session_id_unique", "type": "unique", "columns": ["session_id"] }
+      ],
+      "indexes": [
+        { "name": "idx_ehr_entries_session", "columns": ["session_id"] },
+        { "name": "idx_ehr_entries_patient", "columns": ["patient_id"] }
+      ]
+    },
+    "clinical_letters": {
+      "description": "Clinical letters (referral, summary, etc.) generated by post-session agent (many per session)",
+      "primary_key": "id",
+      "foreign_keys": {
+        "session_id": "sessions.id",
+        "patient_id": "patients.id",
+        "edited_by": "auth.users.id"
+      },
+      "columns": {
+        "id": { "type": "uuid", "nullable": false, "default": "gen_random_uuid()" },
+        "session_id": { "type": "uuid", "nullable": false },
+        "patient_id": { "type": "uuid", "nullable": false },
+        "letter_type": { "type": "text", "nullable": false, "check": "('referral','clinical_summary','follow_up','disability','insurance','specialist','other')" },
+        "recipient_name": { "type": "text", "nullable": true },
+        "recipient_title": { "type": "text", "nullable": true },
+        "recipient_institution": { "type": "text", "nullable": true },
+        "subject_line": { "type": "text", "nullable": false },
+        "body": { "type": "text", "nullable": false },
+        "generated_by": { "type": "text", "nullable": false, "default": "ai", "check": "('ai','doctor')" },
+        "status": { "type": "text", "nullable": false, "default": "draft", "check": "('draft','edited','finalized')" },
+        "edited_by": { "type": "uuid", "nullable": true },
+        "edited_at": { "type": "timestamptz", "nullable": true },
+        "finalized_at": { "type": "timestamptz", "nullable": true },
+        "created_at": { "type": "timestamptz", "nullable": false, "default": "now()" },
+        "updated_at": { "type": "timestamptz", "nullable": false, "default": "now()", "description": "Auto-updated via trigger" }
+      },
+      "indexes": [
+        { "name": "idx_clinical_letters_session", "columns": ["session_id"] },
+        { "name": "idx_clinical_letters_patient", "columns": ["patient_id"] }
       ]
     }
   },
-  "notes": [
-    "This is an example schema. Update with your actual Supabase database structure.",
-    "All timestamps are in UTC with time zone.",
-    "UUIDs are used as primary keys for better distribution and security.",
-    "Add more tables as your application grows."
-  ]
+  "relationships": [
+    { "from": "patients.user_id", "to": "auth.users.id", "type": "one-to-one" },
+    { "from": "doctors.user_id", "to": "auth.users.id", "type": "one-to-one" },
+    { "from": "documents.patient_id", "to": "patients.id", "type": "many-to-one" },
+    { "from": "sessions.patient_id", "to": "patients.id", "type": "many-to-one" },
+    { "from": "sessions.doctor_id", "to": "doctors.id", "type": "many-to-one", "description": "Only for scribe sessions" },
+    { "from": "visit_records.session_id", "to": "sessions.id", "type": "many-to-one" },
+    { "from": "visit_records.patient_id", "to": "patients.id", "type": "many-to-one" },
+    { "from": "session_summaries.session_id", "to": "sessions.id", "type": "one-to-one" },
+    { "from": "session_summaries.patient_id", "to": "patients.id", "type": "many-to-one" },
+    { "from": "soap_notes.session_id", "to": "sessions.id", "type": "one-to-one" },
+    { "from": "soap_notes.patient_id", "to": "patients.id", "type": "many-to-one" },
+    { "from": "ehr_entries.session_id", "to": "sessions.id", "type": "one-to-one" },
+    { "from": "ehr_entries.patient_id", "to": "patients.id", "type": "many-to-one" },
+    { "from": "clinical_letters.session_id", "to": "sessions.id", "type": "many-to-one" },
+    { "from": "clinical_letters.patient_id", "to": "patients.id", "type": "many-to-one" }
+  ],
+  "rls_summary": {
+    "patients": "Users can CRUD their own row (user_id = auth.uid())",
+    "doctors": "Users can SELECT their own row (user_id = auth.uid())",
+    "documents": "Users can CRUD docs where patient_id belongs to them",
+    "sessions": "Users can CRUD sessions where patient_id belongs to them",
+    "visit_records": "Users can SELECT records where patient_id belongs to them (read-only)",
+    "session_summaries": "Users can SELECT summaries where patient_id belongs to them (read-only)",
+    "soap_notes": "Users can SELECT notes where patient_id belongs to them (read-only)",
+    "ehr_entries": "Users can SELECT entries where patient_id belongs to them (read-only)",
+    "clinical_letters": "Users can SELECT letters where patient_id belongs to them (read-only)"
+  }
 }

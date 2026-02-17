@@ -50,14 +50,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .eq("user_id", userId)
           .single();
         if (error) {
-          console.error("fetchDoctor error:", error.message, error.code);
           setDoctor(null);
         } else {
-          console.log("fetchDoctor success:", JSON.stringify(data));
           setDoctor(data);
         }
-      } catch (e) {
-        console.error("fetchDoctor exception:", e);
+      } catch {
         setDoctor(null);
       }
     },
