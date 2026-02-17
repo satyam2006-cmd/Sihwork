@@ -44,33 +44,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchDoctor = useCallback(
     async (userId: string) => {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("doctors")
           .select("*")
           .eq("user_id", userId)
           .single();
-        setDoctor(data);
-      } catch {
+        if (error) {
+          console.error("fetchDoctor error:", error.message, error.code);
+          setDoctor(null);
+        } else {
+          console.log("fetchDoctor success:", JSON.stringify(data));
+          setDoctor(data);
+        }
+      } catch (e) {
+        console.error("fetchDoctor exception:", e);
         setDoctor(null);
       }
     },
     [supabase]
   );
 
+  // Listen for auth state changes — only update user, don't make Supabase
+  // calls inside the callback (causes deadlocks with internal locks).
   useEffect(() => {
-    // Use onAuthStateChange as the sole source of truth.
-    // getSession() can hang due to internal locks in Supabase SSR,
-    // especially under React StrictMode double-mounting.
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchDoctor(session.user.id);
-      } else {
-        setDoctor(null);
-      }
-      // Mark as loaded after the first auth state event
       if (!initialized.current) {
         initialized.current = true;
         setLoading(false);
@@ -89,7 +89,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
       clearTimeout(timeout);
     };
-  }, [supabase, fetchDoctor]);
+  }, [supabase]);
+
+  // Fetch doctor record when user changes — outside onAuthStateChange to avoid deadlock
+  useEffect(() => {
+    if (user) {
+      fetchDoctor(user.id);
+    } else {
+      setDoctor(null);
+    }
+  }, [user, fetchDoctor]);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();

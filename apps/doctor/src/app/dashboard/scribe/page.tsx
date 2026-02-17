@@ -22,6 +22,7 @@ export default function ScribePage() {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchPatients = async () => {
@@ -45,7 +46,13 @@ export default function ScribePage() {
   );
 
   const handleStart = async () => {
-    if (!selectedPatient || !doctor?.id) return;
+    if (!selectedPatient) return;
+    setError(null);
+
+    if (!doctor?.id) {
+      setError("Doctor profile not found. Please sign out and sign in again.");
+      return;
+    }
 
     setCreating(true);
     try {
@@ -61,9 +68,12 @@ export default function ScribePage() {
       if (res.ok) {
         const { session } = await res.json();
         router.push(`/dashboard/scribe/${session.id}`);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Failed to create scribe session");
       }
     } catch {
-      // Error handled by empty catch
+      setError("Network error. Please try again.");
     } finally {
       setCreating(false);
     }
@@ -119,6 +129,12 @@ export default function ScribePage() {
           {selectedPatient && (
             <div className="p-3 bg-gray-50 rounded-md text-sm">
               Selected: <span className="font-medium">{selectedPatient.full_name}</span>
+            </div>
+          )}
+
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+              {error}
             </div>
           )}
 
