@@ -27,7 +27,7 @@ export function useWebSocket(sessionId: string | null) {
         return;
       }
 
-      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3001";
+      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`;
       const url = `${wsUrl}?token=${accessToken}&sessionId=${sessionId}`;
 
       const ws = new WebSocket(url);

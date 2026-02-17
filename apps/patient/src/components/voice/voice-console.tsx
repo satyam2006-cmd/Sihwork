@@ -96,11 +96,23 @@ export function VoiceConsole({ sessionId, onEnd }: VoiceConsoleProps) {
     };
   }, [clearProcessingTimeout, clearSetupTimeout]);
 
-  // Start connection
+  // Clean up WS on unmount (connection is started by user tap, not on mount)
   useEffect(() => {
-    connect();
     return () => disconnect();
-  }, [connect, disconnect]);
+  }, [disconnect]);
+
+  // Warm up audio and start connection — must be called from a user gesture
+  // so that iOS Safari allows subsequent Audio.play() calls (greeting, TTS).
+  const handleBegin = useCallback(() => {
+    // Play a tiny silent WAV to unlock audio on iOS
+    try {
+      const silentAudio = new Audio(
+        "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA="
+      );
+      silentAudio.play().then(() => silentAudio.pause()).catch(() => {});
+    } catch {}
+    connect();
+  }, [connect]);
 
   // Duration timer
   useEffect(() => {
@@ -314,7 +326,18 @@ export function VoiceConsole({ sessionId, onEnd }: VoiceConsoleProps) {
       {/* Voice controls */}
       <Card>
         <CardContent className="p-6 flex flex-col items-center gap-4">
-          {voiceState === "failed" ? (
+          {voiceState === "idle" ? (
+            <div className="text-center space-y-3 py-4">
+              <div className="text-4xl">🎙️</div>
+              <p className="font-medium text-foreground">Ready to start your consultation</p>
+              <p className="text-sm text-muted-foreground max-w-sm">
+                Tap the button below to connect with the AI doctor.
+              </p>
+              <Button size="lg" onClick={handleBegin}>
+                Begin Consultation
+              </Button>
+            </div>
+          ) : voiceState === "failed" ? (
             <div className="text-center space-y-3 py-4">
               <div className="text-4xl">📡</div>
               <p className="font-medium text-foreground">Could not connect to voice server</p>
@@ -325,7 +348,7 @@ export function VoiceConsole({ sessionId, onEnd }: VoiceConsoleProps) {
                 <Button variant="outline" onClick={handleEnd}>
                   End Session
                 </Button>
-                <Button onClick={() => { setVoiceState("connecting"); connect(); }}>
+                <Button onClick={() => { setVoiceState("connecting"); handleBegin(); }}>
                   Retry Connection
                 </Button>
               </div>

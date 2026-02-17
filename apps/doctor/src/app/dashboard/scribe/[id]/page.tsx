@@ -129,6 +129,13 @@ export default function ScribeSessionPage({
   };
 
   const isReady = connectionState === "connected";
+  const isFailed = connectionState === "timeout" || connectionState === "error";
+
+  const handleRetry = () => {
+    disconnect();
+    // Small delay to let the old connection fully close
+    setTimeout(() => connect(), 300);
+  };
 
   return (
     <div className="space-y-4">
@@ -150,6 +157,8 @@ export default function ScribeSessionPage({
                 ? "default"
                 : connectionState === "connecting"
                 ? "secondary"
+                : isFailed
+                ? "destructive"
                 : "outline"
             }
           >
@@ -179,7 +188,9 @@ export default function ScribeSessionPage({
           <div className="max-h-[500px] overflow-y-auto space-y-2">
             {transcript.length === 0 ? (
               <p className="text-gray-400 text-sm text-center py-8">
-                {hasStarted
+                {isFailed
+                  ? "Could not connect to the voice server."
+                  : hasStarted
                   ? "Listening... transcript will appear here"
                   : "Start recording to begin transcription"}
               </p>
@@ -203,7 +214,20 @@ export default function ScribeSessionPage({
 
       {/* Controls */}
       <div className="flex gap-3">
-        {!hasStarted ? (
+        {isFailed ? (
+          <>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => router.push("/dashboard/scribe")}
+            >
+              Back
+            </Button>
+            <Button className="flex-1" onClick={handleRetry}>
+              Retry Connection
+            </Button>
+          </>
+        ) : !hasStarted ? (
           <Button
             className="flex-1"
             disabled={!isReady}
