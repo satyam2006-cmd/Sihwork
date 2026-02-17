@@ -36,7 +36,8 @@ export interface UpdatePatientParams {
 
 export interface CreateSessionParams {
   patient_id: string;
-  mode: 'text' | 'voice';
+  mode: 'text' | 'voice' | 'scribe';
+  doctor_id?: string;
   language?: string;
 }
 
@@ -82,6 +83,7 @@ export interface ListSessionsParams {
   patient_id?: string;
   include_patient_names?: boolean;
   include_review_status?: boolean;
+  mode_filter?: string;
 }
 
 export interface WriteVisitRecordParams {

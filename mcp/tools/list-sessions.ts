@@ -10,6 +10,7 @@ export const listSessionsDefinition = {
       patient_id: { type: 'string', description: 'Filter by patient UUID' },
       include_patient_names: { type: 'boolean', default: false },
       include_review_status: { type: 'boolean', default: false },
+      mode_filter: { type: 'string', description: 'Filter by session mode (text, voice, scribe)' },
     },
   },
 };
@@ -19,11 +20,15 @@ export async function listSessions(params: ListSessionsParams): Promise<{ sessio
 
   let query = supabase
     .from('sessions')
-    .select('id, patient_id, status, mode, language, emergency_flagged, started_at, ended_at')
+    .select('id, patient_id, doctor_id, status, mode, language, emergency_flagged, started_at, ended_at')
     .order('started_at', { ascending: false });
 
   if (params.patient_id) {
     query = query.eq('patient_id', params.patient_id);
+  }
+
+  if (params.mode_filter) {
+    query = query.eq('mode', params.mode_filter);
   }
 
   const { data: sessions, error } = await query;

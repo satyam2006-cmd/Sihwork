@@ -1,10 +1,17 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { getAccessTokenFromCookie } from "@/lib/supabase";
-import type { WSMessage } from "@second-opinion/shared";
 
 type ConnectionState = "disconnected" | "connecting" | "connected" | "error" | "timeout";
 
-export function useWebSocket(sessionId: string | null) {
+interface WSMessage {
+  type: string;
+  text?: string;
+  role?: string;
+  language?: string;
+  data?: { status?: string; message?: string };
+}
+
+export function useScribeWebSocket(sessionId: string | null) {
   const wsRef = useRef<WebSocket | null>(null);
   const [connectionState, setConnectionState] = useState<ConnectionState>("disconnected");
   const [lastMessage, setLastMessage] = useState<WSMessage | null>(null);
@@ -33,7 +40,6 @@ export function useWebSocket(sessionId: string | null) {
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
-      // Connection timeout - if not connected within 10s, give up
       connectTimeoutRef.current = setTimeout(() => {
         if (ws.readyState !== WebSocket.OPEN) {
           ws.close();
@@ -62,13 +68,10 @@ export function useWebSocket(sessionId: string | null) {
         wsRef.current = null;
 
         if (event.code === 1000) {
-          // Normal close (user disconnected or session ended gracefully)
           setConnectionState("disconnected");
         } else if (event.code === 1008) {
-          // Policy violation — auth failed or session not found
           setConnectionState("error");
         } else {
-          // Unexpected close — auto-reconnect with retry limit
           if (retryCountRef.current < maxRetries) {
             retryCountRef.current++;
             setConnectionState("connecting");
@@ -82,7 +85,7 @@ export function useWebSocket(sessionId: string | null) {
       };
 
       ws.onerror = () => {
-        // onerror is always followed by onclose, so let onclose handle state
+        // onerror is always followed by onclose
       };
     } catch (error) {
       console.error("WebSocket connection error:", error);
@@ -118,12 +121,6 @@ export function useWebSocket(sessionId: string | null) {
     return false;
   }, []);
 
-  const sendText = useCallback((text: string) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: "text", text }));
-    }
-  }, []);
-
   const sendControl = useCallback((type: string, data?: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type, ...data }));
@@ -142,7 +139,6 @@ export function useWebSocket(sessionId: string | null) {
     connect,
     disconnect,
     sendAudio,
-    sendText,
     sendControl,
   };
 }

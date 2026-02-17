@@ -201,7 +201,9 @@ export default function SessionDetailPage({
               {session.patient_name}
             </Link>{" "}
             &middot; {new Date(session.started_at).toLocaleString()} &middot;{" "}
-            <span className="capitalize">{session.mode}</span> mode
+            <span className="capitalize">
+              {session.mode === "scribe" ? "Clinic Visit (Scribe)" : `${session.mode} mode`}
+            </span>
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -250,13 +252,17 @@ export default function SessionDetailPage({
                   <div
                     key={i}
                     className={`p-3 rounded-lg text-sm ${
-                      msg.role === "assistant"
+                      session.mode === "scribe"
+                        ? "bg-gray-50 border border-gray-100"
+                        : msg.role === "assistant"
                         ? "bg-blue-50 border border-blue-100"
                         : "bg-gray-50 border border-gray-100"
                     }`}
                   >
-                    <p className="font-medium text-xs text-gray-500 mb-1 capitalize">
-                      {msg.role}
+                    <p className="font-medium text-xs text-gray-500 mb-1">
+                      {session.mode === "scribe" && msg.timestamp
+                        ? new Date(msg.timestamp).toLocaleTimeString()
+                        : <span className="capitalize">{msg.role}</span>}
                     </p>
                     <p className="whitespace-pre-wrap">{msg.content}</p>
                   </div>

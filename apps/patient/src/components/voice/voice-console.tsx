@@ -220,9 +220,9 @@ export function VoiceConsole({ sessionId, onEnd }: VoiceConsoleProps) {
   }, [voiceState, startRecording]);
 
   const handlePTTEnd = useCallback(async () => {
-    const audioBuffer = await stopRecording();
-    if (audioBuffer && audioBuffer.byteLength > 0) {
-      const sent = sendAudio(audioBuffer);
+    const result = await stopRecording();
+    if (result && result.buffer.byteLength > 0) {
+      const sent = sendAudio(result.buffer, result.mimeType);
       if (sent) {
         setVoiceState("processing");
         startProcessingTimeout();

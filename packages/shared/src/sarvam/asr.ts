@@ -7,13 +7,13 @@ export interface ASRResult {
 
 const ASR_TIMEOUT_MS = 15_000;
 
-export async function speechToText(audioBuffer: Buffer): Promise<ASRResult> {
+export async function speechToText(audioBuffer: Buffer, mimeType: string = 'audio/webm'): Promise<ASRResult> {
   const config = getSarvamConfig();
 
+  const ext = mimeTypeToExtension(mimeType);
   const formData = new FormData();
-  // Send as audio/webm since the client records WebM/Opus — not WAV
-  const audioBlob = new Blob([new Uint8Array(audioBuffer) as BlobPart], { type: 'audio/webm' });
-  formData.append('file', audioBlob, 'audio.webm');
+  const audioBlob = new Blob([new Uint8Array(audioBuffer) as BlobPart], { type: mimeType });
+  formData.append('file', audioBlob, `audio${ext}`);
   formData.append('model', 'saaras:v3');
   formData.append('language_code', 'unknown');
 
@@ -58,4 +58,15 @@ export async function speechToText(audioBuffer: Buffer): Promise<ASRResult> {
     transcript: result.transcript,
     language_code: result.language_code || 'en',
   };
+}
+
+function mimeTypeToExtension(mimeType: string): string {
+  const base = mimeType.split(';')[0].trim();
+  switch (base) {
+    case 'audio/mp4': return '.mp4';
+    case 'audio/ogg': return '.ogg';
+    case 'audio/wav': return '.wav';
+    case 'audio/webm':
+    default: return '.webm';
+  }
 }

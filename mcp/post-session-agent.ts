@@ -13,7 +13,26 @@ import type {
   WriteSOAPNoteParams, WriteEHREntryParams, WriteClinicalLetterParams,
 } from './types';
 
-const POST_SESSION_SYSTEM_PROMPT = `You are a medical documentation AI agent. You have just completed a consultation between a virtual doctor and a patient. Your task is to:
+function buildPostSessionSystemPrompt(sessionMode?: 'text' | 'voice' | 'scribe'): string {
+  const isScribe = sessionMode === 'scribe';
+
+  const contextLine = isScribe
+    ? 'You are a medical documentation AI agent. You have the transcript of an in-person clinic visit between a doctor and a patient. The transcript was captured via a real-time scribe — speakers are NOT labeled, so you must infer who is speaking from context (clinical questions = doctor, symptom descriptions = patient).'
+    : 'You are a medical documentation AI agent. You have just completed a consultation between a virtual doctor and a patient.';
+
+  const soapObjective = isScribe
+    ? '- O (Objective): Observable findings discussed during the visit. Extract physical exam findings as discussed in the conversation. 2-6 sentences.'
+    : '- O (Objective): Observable findings. Note "Virtual encounter — limited physical examination". 2-6 sentences.';
+
+  const ehrPhysicalExam = isScribe
+    ? '- Extract physical exam findings as discussed during the in-person visit'
+    : '- Note virtual encounter limitations in physical exam';
+
+  const encounterTypeGuidance = isScribe
+    ? '- Use encounter_type "in_person_visit" for this in-person clinic visit'
+    : '- Use appropriate encounter_type (virtual_consultation, follow_up, urgent, emergency)';
+
+  return `${contextLine} Your task is to:
 
 1. EXTRACT structured clinical data from the transcript
 2. EVALUATE your own extraction confidence (0-1 scale)
@@ -47,14 +66,15 @@ PATIENT UPDATE GUIDELINES:
 
 SOAP NOTE GUIDELINES:
 - S (Subjective): Patient-reported symptoms, concerns, history. 2-6 sentences.
-- O (Objective): Observable findings. Note "Virtual encounter — limited physical examination". 2-6 sentences.
+${soapObjective}
 - A (Assessment): Clinical impression, differentials, risk stratification. 2-6 sentences.
 - P (Plan): Diagnostics, therapeutics, referrals, follow-up, education, red flags. 2-6 sentences.
 
 EHR ENTRY GUIDELINES:
 - Use OLDCARTS format for HPI where applicable
 - Include ICD codes only when clearly identifiable
-- Note virtual encounter limitations in physical exam
+${ehrPhysicalExam}
+${encounterTypeGuidance}
 - Organize assessment and plan by problem/diagnosis
 
 CLINICAL LETTER GUIDELINES:
@@ -66,6 +86,7 @@ REQUIRED TOOLS: write_visit_record, write_session_summary, write_soap_note, writ
 CONDITIONAL TOOLS: write_clinical_letter (only if referral recommended), update_patient (only if new conditions/medications)
 
 You MUST call all required tools before finishing.`;
+}
 
 // Tool definitions for the post-session agent
 const POST_SESSION_TOOLS: Anthropic.Tool[] = [
@@ -175,7 +196,7 @@ const POST_SESSION_TOOLS: Anthropic.Tool[] = [
     input_schema: {
       type: 'object' as const,
       properties: {
-        encounter_type: { type: 'string', enum: ['virtual_consultation', 'follow_up', 'urgent', 'emergency'], description: 'Type of encounter' },
+        encounter_type: { type: 'string', enum: ['virtual_consultation', 'follow_up', 'urgent', 'emergency', 'in_person_visit'], description: 'Type of encounter' },
         chief_complaint: { type: 'string', description: 'Primary reason for visit' },
         history_of_present_illness: { type: 'string', description: 'HPI using OLDCARTS format where applicable' },
         past_medical_history: { type: 'string', description: 'Relevant PMH discussed' },
@@ -280,6 +301,7 @@ export async function runPostSessionAgent(
   patientId: string,
   transcript: ChatMessage[],
   ehrContext?: string,
+  sessionMode?: 'text' | 'voice' | 'scribe',
 ): Promise<PostSessionResult> {
   const client = getAnthropicClient();
   const result: PostSessionResult = {
@@ -288,9 +310,10 @@ export async function runPostSessionAgent(
     errors: [],
   };
 
-  const rawTranscript = transcript
-    .map(m => `${m.role === 'user' ? 'Patient' : 'Doctor'}: ${m.content}`)
-    .join('\n');
+  // Scribe transcripts are raw ASR chunks — don't label speakers, let LLM infer
+  const rawTranscript = sessionMode === 'scribe'
+    ? transcript.map(m => m.content).join('\n\n')
+    : transcript.map(m => `${m.role === 'user' ? 'Patient' : 'Doctor'}: ${m.content}`).join('\n');
 
   // Compact long transcripts to stay within token limits (full transcript stays in DB for audit)
   const transcriptText = await compactTranscript(rawTranscript, 50_000);
@@ -312,7 +335,7 @@ export async function runPostSessionAgent(
     const response = await client.messages.create({
       model: MODELS.advanced,
       max_tokens: 8192,
-      system: POST_SESSION_SYSTEM_PROMPT,
+      system: buildPostSessionSystemPrompt(sessionMode),
       messages,
       tools: POST_SESSION_TOOLS,
     });

@@ -1,5 +1,8 @@
 import { Stethoscope, User } from "lucide-react";
 
+const doctorUrl = process.env.NEXT_PUBLIC_DOCTOR_URL || "http://localhost:3002";
+const patientUrl = process.env.NEXT_PUBLIC_PATIENT_URL || "http://localhost:3000";
+
 export default function PortalPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4">
@@ -14,7 +17,7 @@ export default function PortalPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-2xl">
         <a
-          href="/doctor"
+          href={doctorUrl}
           className="group flex flex-col items-center gap-4 rounded-xl border border-border bg-card p-8 shadow-sm transition-all hover:shadow-md hover:border-primary/40 hover:-translate-y-0.5"
         >
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">
@@ -31,7 +34,7 @@ export default function PortalPage() {
         </a>
 
         <a
-          href="/patient"
+          href={patientUrl}
           className="group flex flex-col items-center gap-4 rounded-xl border border-border bg-card p-8 shadow-sm transition-all hover:shadow-md hover:border-primary/40 hover:-translate-y-0.5"
         >
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary/20">

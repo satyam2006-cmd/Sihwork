@@ -8,7 +8,8 @@ export const createSessionDefinition = {
     type: 'object' as const,
     properties: {
       patient_id: { type: 'string', description: 'The patient UUID' },
-      mode: { type: 'string', enum: ['text', 'voice'], description: 'Consultation mode' },
+      mode: { type: 'string', enum: ['text', 'voice', 'scribe'], description: 'Consultation mode' },
+      doctor_id: { type: 'string', description: 'Doctor UUID (required for scribe mode)' },
       language: { type: 'string', description: 'Language code (default: en)', default: 'en' },
     },
     required: ['patient_id', 'mode'],
@@ -18,14 +19,19 @@ export const createSessionDefinition = {
 export async function createSession(params: CreateSessionParams): Promise<{ session: Record<string, unknown> }> {
   const supabase = createServiceClient();
 
+  const insertData: Record<string, unknown> = {
+    patient_id: params.patient_id,
+    mode: params.mode,
+    language: params.language || 'en',
+    status: 'active',
+  };
+  if (params.doctor_id) {
+    insertData.doctor_id = params.doctor_id;
+  }
+
   const { data: session, error } = await supabase
     .from('sessions')
-    .insert({
-      patient_id: params.patient_id,
-      mode: params.mode,
-      language: params.language || 'en',
-      status: 'active',
-    })
+    .insert(insertData)
     .select()
     .single();
 

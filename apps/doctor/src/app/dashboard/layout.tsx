@@ -11,6 +11,7 @@ const navItems = [
   { href: "/dashboard", label: "Overview", icon: "📊" },
   { href: "/dashboard/patients", label: "Patients", icon: "👥" },
   { href: "/dashboard/sessions", label: "Sessions", icon: "📋" },
+  { href: "/dashboard/scribe", label: "Clinic Scribe", icon: "🎙️" },
 ];
 
 export default function DashboardLayout({

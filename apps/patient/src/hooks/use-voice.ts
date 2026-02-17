@@ -107,18 +107,19 @@ export function useVoice() {
     }
   }, [isRecording, getAudioContext]);
 
-  const stopRecording = useCallback(async (): Promise<ArrayBuffer | null> => {
+  const stopRecording = useCallback(async (): Promise<{ buffer: ArrayBuffer; mimeType: string } | null> => {
     return new Promise((resolve) => {
       if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") {
         resolve(null);
         return;
       }
 
+      const recordedMimeType = mediaRecorderRef.current.mimeType || "audio/webm";
+
       mediaRecorderRef.current.onstop = async () => {
-        const mimeType = mediaRecorderRef.current?.mimeType || "audio/webm";
-        const blob = new Blob(chunksRef.current, { type: mimeType });
+        const blob = new Blob(chunksRef.current, { type: recordedMimeType });
         const arrayBuffer = await blob.arrayBuffer();
-        resolve(arrayBuffer);
+        resolve({ buffer: arrayBuffer, mimeType: recordedMimeType });
       };
 
       mediaRecorderRef.current.stop();

@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { createClient } from "@supabase/supabase-js";
 import { SessionManager } from "./session-manager";
+import { ScribeSessionManager } from "./scribe-session-manager";
 
 // Load env from .env.local
 import { config } from "dotenv";
@@ -73,18 +74,43 @@ wss.on("connection", async (ws, req) => {
     .eq("id", sessionId)
     .single();
 
-  if (sessionError || !session || session.patients?.user_id !== user.id) {
+  if (sessionError || !session) {
     ws.send(JSON.stringify({ type: "error", text: "Session not found" }));
     ws.close(1008, "Session not found");
     return;
   }
 
-  console.log(`Client connected: user=${user.id}, session=${sessionId}`);
+  const isScribe = session.mode === "scribe";
 
-  // Create session manager
-  const manager = new SessionManager(ws, sessionId, session.patients.id);
+  // Auth: scribe sessions verify doctor ownership, patient sessions verify patient ownership
+  if (isScribe) {
+    const { data: doctor } = await serviceClient
+      .from("doctors")
+      .select("id")
+      .eq("user_id", user.id)
+      .single();
 
-  // Initialize (loads EHR, sends greeting) — await so errors are caught
+    if (!doctor || session.doctor_id !== doctor.id) {
+      ws.send(JSON.stringify({ type: "error", text: "Not authorized for this scribe session" }));
+      ws.close(1008, "Auth failed");
+      return;
+    }
+  } else {
+    if (session.patients?.user_id !== user.id) {
+      ws.send(JSON.stringify({ type: "error", text: "Session not found" }));
+      ws.close(1008, "Session not found");
+      return;
+    }
+  }
+
+  console.log(`Client connected: user=${user.id}, session=${sessionId}, mode=${session.mode}`);
+
+  // Create appropriate manager based on session mode
+  const manager = isScribe
+    ? new ScribeSessionManager(ws, sessionId, session.patients.id)
+    : new SessionManager(ws, sessionId, session.patients.id);
+
+  // Initialize
   await manager.initialize();
 
   ws.on("message", async (data, isBinary) => {
@@ -99,13 +125,20 @@ wss.on("connection", async (ws, req) => {
 
         switch (message.type) {
           case "text":
-            if (typeof message.text === "string") {
-              await manager.handleTextMessage(message.text);
+            if (!isScribe && "handleTextMessage" in manager) {
+              if (typeof message.text === "string") {
+                await (manager as SessionManager).handleTextMessage(message.text);
+              }
             }
             break;
           case "language":
             if (typeof message.language === "string") {
               manager.setLanguage(message.language);
+            }
+            break;
+          case "audio_meta":
+            if (typeof message.mimeType === "string") {
+              manager.setAudioMimeType(message.mimeType);
             }
             break;
           case "end":

@@ -14,14 +14,15 @@ export interface PipelineResult {
 export async function processUtterance(
   audioBuffer: Buffer,
   engine: ConversationEngine,
-  preferredLanguage?: string
+  preferredLanguage?: string,
+  mimeType?: string
 ): Promise<PipelineResult> {
   // Step 1: Sarvam ASR → English transcript + detected language
   let transcript: string;
   let detectedLanguage: string;
 
   try {
-    const asrResult = await speechToText(audioBuffer);
+    const asrResult = await speechToText(audioBuffer, mimeType);
     transcript = asrResult.transcript;
     detectedLanguage = asrResult.language_code || preferredLanguage || "en";
   } catch (error) {

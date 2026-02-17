@@ -96,7 +96,15 @@ export default function SessionsPage() {
                     {session.patient_name}
                   </Link>
                 </TableCell>
-                <TableCell className="capitalize">{session.mode}</TableCell>
+                <TableCell>
+                  {session.mode === "scribe" ? (
+                    <Badge variant="secondary" className="text-purple-700 bg-purple-100">
+                      Clinic Visit
+                    </Badge>
+                  ) : (
+                    <span className="capitalize">{session.mode}</span>
+                  )}
+                </TableCell>
                 <TableCell>
                   <Badge
                     variant={

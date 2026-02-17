@@ -12,6 +12,7 @@ export class SessionManager {
   private sessionId: string;
   private patientId: string;
   private language: string = "en";
+  private audioMimeType: string = "audio/webm";
   private isProcessing: boolean = false;
   private isEnded: boolean = false;
 
@@ -91,7 +92,8 @@ export class SessionManager {
       const result = await processUtterance(
         audioBuffer,
         this.engine,
-        this.language
+        this.language,
+        this.audioMimeType
       );
 
       // Update language preference
@@ -178,6 +180,10 @@ export class SessionManager {
 
   setLanguage(language: string): void {
     this.language = language;
+  }
+
+  setAudioMimeType(mimeType: string): void {
+    this.audioMimeType = mimeType;
   }
 
   async endSession(): Promise<void> {
