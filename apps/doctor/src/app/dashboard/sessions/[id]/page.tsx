@@ -189,10 +189,10 @@ export default function SessionDetailPage({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
         <div>
-          <h1 className="text-3xl font-bold">Session Detail</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold">Session Detail</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
             Patient:{" "}
             <Link
               href={`/dashboard/patients/${session.patient_id}`}
@@ -274,49 +274,53 @@ export default function SessionDetailPage({
 
         {/* Tabbed Clinical Documents */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="visit-record">Visit Record</TabsTrigger>
-            <TabsTrigger value="summary">Summary</TabsTrigger>
-            <TabsTrigger value="soap">SOAP Note</TabsTrigger>
-            <TabsTrigger value="ehr">EHR Entry</TabsTrigger>
-            <TabsTrigger value="letters">
-              Letters
-              {Array.isArray(session.clinical_letters) && session.clinical_letters.length > 0 && (
-                <Badge variant="secondary" className="ml-1 text-xs px-1">
-                  {session.clinical_letters.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+            <TabsList className="w-max md:w-auto">
+              <TabsTrigger value="visit-record">Visit Record</TabsTrigger>
+              <TabsTrigger value="summary">Summary</TabsTrigger>
+              <TabsTrigger value="soap">SOAP Note</TabsTrigger>
+              <TabsTrigger value="ehr">EHR Entry</TabsTrigger>
+              <TabsTrigger value="letters">
+                Letters
+                {Array.isArray(session.clinical_letters) && session.clinical_letters.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 text-xs px-1">
+                    {session.clinical_letters.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Visit Record Tab */}
           <TabsContent value="visit-record">
             {session.visit_record ? (
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Visit Record</CardTitle>
-                  <div className="flex items-center gap-2">
-                    {session.visit_record.confidence_score !== null && (
-                      <Badge variant="outline">
-                        Confidence:{" "}
-                        {Math.round(
-                          session.visit_record.confidence_score * 100
-                        )}
-                        %
-                      </Badge>
-                    )}
-                    {session.visit_record.needs_review &&
-                    !session.visit_record.reviewed_at ? (
-                      <Button
-                        size="sm"
-                        onClick={handleMarkReviewed}
-                        disabled={marking}
-                      >
-                        {marking ? "Marking..." : "Mark Reviewed"}
-                      </Button>
-                    ) : session.visit_record.reviewed_at ? (
-                      <Badge variant="default">Reviewed</Badge>
-                    ) : null}
+                <CardHeader>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <CardTitle>Visit Record</CardTitle>
+                    <div className="flex items-center gap-2">
+                      {session.visit_record.confidence_score !== null && (
+                        <Badge variant="outline">
+                          Confidence:{" "}
+                          {Math.round(
+                            session.visit_record.confidence_score * 100
+                          )}
+                          %
+                        </Badge>
+                      )}
+                      {session.visit_record.needs_review &&
+                      !session.visit_record.reviewed_at ? (
+                        <Button
+                          size="sm"
+                          onClick={handleMarkReviewed}
+                          disabled={marking}
+                        >
+                          {marking ? "Marking..." : "Mark Reviewed"}
+                        </Button>
+                      ) : session.visit_record.reviewed_at ? (
+                        <Badge variant="default">Reviewed</Badge>
+                      ) : null}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">

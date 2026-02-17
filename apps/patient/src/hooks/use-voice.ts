@@ -18,6 +18,12 @@ function getSupportedMimeType(): string {
   return "";
 }
 
+// Safari / older iOS may expose webkitAudioContext instead of AudioContext
+const AudioCtx =
+  typeof window !== "undefined"
+    ? window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    : undefined;
+
 export function useVoice() {
   const [isRecording, setIsRecording] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
@@ -29,6 +35,7 @@ export function useVoice() {
   const animationFrameRef = useRef<number | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const playbackIdRef = useRef(0);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Clean up AudioContext on unmount
   useEffect(() => {
@@ -38,12 +45,18 @@ export function useVoice() {
       }
       audioContextRef.current?.close().catch(() => {});
       audioContextRef.current = null;
+      // Stop any in-flight playback
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current = null;
+      }
     };
   }, []);
 
   const getAudioContext = useCallback((): AudioContext => {
     if (!audioContextRef.current || audioContextRef.current.state === "closed") {
-      audioContextRef.current = new AudioContext();
+      if (!AudioCtx) throw new Error("AudioContext not supported");
+      audioContextRef.current = new AudioCtx();
     }
     return audioContextRef.current;
   }, []);
@@ -114,7 +127,7 @@ export function useVoice() {
         return;
       }
 
-      const recordedMimeType = mediaRecorderRef.current.mimeType || "audio/webm";
+      const recordedMimeType = mediaRecorderRef.current.mimeType || getSupportedMimeType() || "audio/mp4";
 
       mediaRecorderRef.current.onstop = async () => {
         const blob = new Blob(chunksRef.current, { type: recordedMimeType });
@@ -148,36 +161,50 @@ export function useVoice() {
     // Track playback ID so stale completions don't interfere
     const thisPlaybackId = ++playbackIdRef.current;
 
-    try {
-      const audioContext = getAudioContext();
-      if (audioContext.state === "suspended") {
-        await audioContext.resume();
-      }
+    // Stop any currently-playing audio
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
 
-      // Decode base64 to ArrayBuffer
+    try {
+      // Use HTML5 Audio element — works on iOS without requiring a user gesture
+      // for each play() call (audio is unlocked after first user interaction).
       const binaryString = atob(base64Audio);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
 
-      const audioBuffer = await audioContext.decodeAudioData(bytes.buffer);
+      // Sarvam TTS returns WAV audio; use generic type so browser auto-detects
+      const blob = new Blob([bytes], { type: "audio/wav" });
+      const url = URL.createObjectURL(blob);
 
-      // Check if a newer playback was started while we were decoding
-      if (playbackIdRef.current !== thisPlaybackId) return;
+      if (playbackIdRef.current !== thisPlaybackId) {
+        URL.revokeObjectURL(url);
+        return;
+      }
 
-      const source = audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContext.destination);
+      const audio = new Audio(url);
+      currentAudioRef.current = audio;
 
       return new Promise<void>((resolve) => {
-        source.onended = () => resolve();
-        source.start();
+        const cleanup = () => {
+          URL.revokeObjectURL(url);
+          if (currentAudioRef.current === audio) {
+            currentAudioRef.current = null;
+          }
+        };
+
+        audio.onended = () => { cleanup(); resolve(); };
+        audio.onerror = () => { cleanup(); resolve(); };
+
+        audio.play().catch(() => { cleanup(); resolve(); });
       });
     } catch (error) {
       console.error("Failed to play audio:", error);
     }
-  }, [getAudioContext]);
+  }, []);
 
   return {
     isRecording,

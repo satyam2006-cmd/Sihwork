@@ -49,11 +49,6 @@ export default function ScribePage() {
     if (!selectedPatient) return;
     setError(null);
 
-    if (!doctor?.id) {
-      setError("Doctor profile not found. Please sign out and sign in again.");
-      return;
-    }
-
     setCreating(true);
     try {
       const res = await apiFetch("/api/sessions/scribe", {
@@ -61,7 +56,7 @@ export default function ScribePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           patient_id: selectedPatient.id,
-          doctor_id: doctor.id,
+          doctor_id: doctor!.id,
         }),
       });
 

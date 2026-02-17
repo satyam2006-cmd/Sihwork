@@ -64,52 +64,56 @@ export default function PatientsPage() {
       {patients.length === 0 ? (
         <p className="text-gray-500">No patients found.</p>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Gender</TableHead>
-              <TableHead>Last Visit</TableHead>
-              <TableHead>Sessions</TableHead>
-              <TableHead>Conditions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {patients.map((patient) => (
-              <TableRow key={patient.id}>
-                <TableCell>
-                  <Link
-                    href={`/dashboard/patients/${patient.id}`}
-                    className="text-blue-600 hover:underline font-medium"
-                  >
-                    {patient.full_name}
-                  </Link>
-                </TableCell>
-                <TableCell className="capitalize">
-                  {patient.gender || "—"}
-                </TableCell>
-                <TableCell>
-                  {patient.last_session_at
-                    ? new Date(patient.last_session_at).toLocaleDateString()
-                    : "—"}
-                </TableCell>
-                <TableCell>{patient.session_count}</TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {Array.isArray(patient.chronic_conditions) &&
-                    patient.chronic_conditions.length > 0
-                      ? patient.chronic_conditions.map((c, i) => (
-                          <Badge key={i} variant="secondary">
-                            {c}
-                          </Badge>
-                        ))
-                      : "—"}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <div className="overflow-x-auto -mx-4 md:mx-0">
+          <div className="min-w-[600px] px-4 md:px-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Gender</TableHead>
+                  <TableHead>Last Visit</TableHead>
+                  <TableHead>Sessions</TableHead>
+                  <TableHead>Conditions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {patients.map((patient) => (
+                  <TableRow key={patient.id}>
+                    <TableCell>
+                      <Link
+                        href={`/dashboard/patients/${patient.id}`}
+                        className="text-blue-600 hover:underline font-medium"
+                      >
+                        {patient.full_name}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="capitalize">
+                      {patient.gender || "---"}
+                    </TableCell>
+                    <TableCell>
+                      {patient.last_session_at
+                        ? new Date(patient.last_session_at).toLocaleDateString()
+                        : "---"}
+                    </TableCell>
+                    <TableCell>{patient.session_count}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {Array.isArray(patient.chronic_conditions) &&
+                        patient.chronic_conditions.length > 0
+                          ? patient.chronic_conditions.map((c, i) => (
+                              <Badge key={i} variant="secondary">
+                                {c}
+                              </Badge>
+                            ))
+                          : "---"}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
       )}
     </div>
   );

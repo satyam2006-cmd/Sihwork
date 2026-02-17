@@ -133,12 +133,12 @@ export default function ScribeSessionPage({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold">Clinic Visit Scribe</h1>
-          <p className="text-gray-500 text-sm">Session {sessionId.slice(0, 8)}...</p>
+          <h1 className="text-xl sm:text-2xl font-bold">Clinic Visit Scribe</h1>
+          <p className="text-muted-foreground text-sm">Session {sessionId.slice(0, 8)}...</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {isRecording && (
             <Badge variant="destructive" className="animate-pulse">
               Recording {formatDuration(duration)}

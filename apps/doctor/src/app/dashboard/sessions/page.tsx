@@ -66,78 +66,82 @@ export default function SessionsPage() {
       {sessions.length === 0 ? (
         <p className="text-gray-500">No sessions found.</p>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Patient</TableHead>
-              <TableHead>Mode</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Review</TableHead>
-              <TableHead>Emergency</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sessions.map((session) => (
-              <TableRow key={session.id}>
-                <TableCell>
-                  <Link
-                    href={`/dashboard/sessions/${session.id}`}
-                    className="text-blue-600 hover:underline"
-                  >
-                    {new Date(session.started_at).toLocaleDateString()}
-                  </Link>
-                </TableCell>
-                <TableCell>
-                  <Link
-                    href={`/dashboard/patients/${session.patient_id}`}
-                    className="hover:underline"
-                  >
-                    {session.patient_name}
-                  </Link>
-                </TableCell>
-                <TableCell>
-                  {session.mode === "scribe" ? (
-                    <Badge variant="secondary" className="text-purple-700 bg-purple-100">
-                      Clinic Visit
-                    </Badge>
-                  ) : (
-                    <span className="capitalize">{session.mode}</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={
-                      session.status === "completed"
-                        ? "default"
-                        : session.status === "active"
-                        ? "secondary"
-                        : "outline"
-                    }
-                  >
-                    {session.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {session.needs_review ? (
-                    <Badge variant="secondary" className="text-amber-700 bg-amber-100">
-                      Needs Review
-                    </Badge>
-                  ) : (
-                    <span className="text-gray-400">—</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {session.emergency_flagged ? (
-                    <Badge variant="destructive">Flagged</Badge>
-                  ) : (
-                    <span className="text-gray-400">—</span>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <div className="overflow-x-auto -mx-4 md:mx-0">
+          <div className="min-w-[600px] px-4 md:px-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Patient</TableHead>
+                  <TableHead>Mode</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Review</TableHead>
+                  <TableHead>Emergency</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sessions.map((session) => (
+                  <TableRow key={session.id}>
+                    <TableCell>
+                      <Link
+                        href={`/dashboard/sessions/${session.id}`}
+                        className="text-blue-600 hover:underline"
+                      >
+                        {new Date(session.started_at).toLocaleDateString()}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Link
+                        href={`/dashboard/patients/${session.patient_id}`}
+                        className="hover:underline"
+                      >
+                        {session.patient_name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      {session.mode === "scribe" ? (
+                        <Badge variant="secondary" className="text-purple-700 bg-purple-100">
+                          Clinic Visit
+                        </Badge>
+                      ) : (
+                        <span className="capitalize">{session.mode}</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          session.status === "completed"
+                            ? "default"
+                            : session.status === "active"
+                            ? "secondary"
+                            : "outline"
+                        }
+                      >
+                        {session.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {session.needs_review ? (
+                        <Badge variant="secondary" className="text-amber-700 bg-amber-100">
+                          Needs Review
+                        </Badge>
+                      ) : (
+                        <span className="text-gray-400">---</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {session.emergency_flagged ? (
+                        <Badge variant="destructive">Flagged</Badge>
+                      ) : (
+                        <span className="text-gray-400">---</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
       )}
     </div>
   );

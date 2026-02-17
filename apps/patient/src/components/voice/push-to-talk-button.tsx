@@ -24,7 +24,9 @@ export function PushToTalkButton({
       onPointerLeave={() => {
         if (isRecording) onEnd();
       }}
+      onContextMenu={(e) => e.preventDefault()}
       disabled={disabled}
+      style={{ WebkitTouchCallout: "none" } as React.CSSProperties}
       className={`
         w-20 h-20 rounded-full flex items-center justify-center
         transition-all duration-200 select-none touch-none
