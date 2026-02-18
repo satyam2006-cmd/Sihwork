@@ -190,40 +190,44 @@ export function useVoice() {
 
       if (playbackIdRef.current !== thisPlaybackId) return;
 
-      // Primary: AudioContext-based playback.
-      // On iOS Safari, Audio.play() can silently fail after getUserMedia
-      // changes the audio session. AudioContext playback works reliably
-      // once the context has been resumed during a user gesture.
-      try {
-        const audioContext = getAudioContext();
-        if (audioContext.state === "suspended") {
-          await audioContext.resume();
+      // Use AudioContext playback ONLY when the context is already running
+      // (i.e. after recording has used it). On iOS Safari, Audio.play()
+      // silently fails after getUserMedia disrupts the audio session, but
+      // AudioContext playback still works because the context was resumed
+      // during the PTT user gesture.
+      //
+      // Before any recording (e.g. the greeting), the AudioContext is
+      // suspended on iOS and can't be resumed without a user gesture,
+      // so we use the Audio element which works fine at that point.
+      const audioContext = audioContextRef.current;
+      if (audioContext && audioContext.state === "running") {
+        try {
+          const audioBuffer = await audioContext.decodeAudioData(bytes.buffer.slice(0));
+          if (playbackIdRef.current !== thisPlaybackId) return;
+
+          const source = audioContext.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(audioContext.destination);
+          currentSourceRef.current = source;
+
+          return new Promise<void>((resolve) => {
+            source.onended = () => {
+              if (currentSourceRef.current === source) {
+                currentSourceRef.current = null;
+              }
+              resolve();
+            };
+            source.start(0);
+          });
+        } catch {
+          // decodeAudioData failed — fall through to Audio element
         }
-
-        const audioBuffer = await audioContext.decodeAudioData(bytes.buffer.slice(0));
-        if (playbackIdRef.current !== thisPlaybackId) return;
-
-        const source = audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(audioContext.destination);
-        currentSourceRef.current = source;
-
-        return new Promise<void>((resolve) => {
-          source.onended = () => {
-            if (currentSourceRef.current === source) {
-              currentSourceRef.current = null;
-            }
-            resolve();
-          };
-          source.start(0);
-        });
-      } catch {
-        // decodeAudioData can fail on some browsers — fall through to Audio element
       }
 
       if (playbackIdRef.current !== thisPlaybackId) return;
 
-      // Fallback: HTML5 Audio element (works on desktop browsers)
+      // Default: HTML5 Audio element — works before any mic usage and
+      // on desktop browsers where autoplay restrictions are relaxed.
       const blob = new Blob([bytes], { type: "audio/wav" });
       const url = URL.createObjectURL(blob);
 
@@ -251,7 +255,7 @@ export function useVoice() {
     } catch (error) {
       console.error("Failed to play audio:", error);
     }
-  }, [getAudioContext]);
+  }, []);
 
   return {
     isRecording,
