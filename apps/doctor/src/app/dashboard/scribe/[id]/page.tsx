@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
-import { useScribeWebSocket } from "@/hooks/use-scribe-websocket";
+import { useScribeSession } from "@/hooks/use-scribe-session";
 import { useScribeRecording } from "@/hooks/use-scribe-recording";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,42 +29,27 @@ export default function ScribeSessionPage({
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const durationRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const { connectionState, lastMessage, connect, disconnect, sendAudio, sendControl } =
-    useScribeWebSocket(sessionId);
+  const { isProcessing, transcribe } = useScribeSession(sessionId);
 
   const onAudioChunk = useCallback(
-    (buffer: ArrayBuffer, mimeType: string) => {
-      sendAudio(buffer, mimeType);
+    async (buffer: ArrayBuffer, mimeType: string) => {
+      const result = await transcribe(buffer, mimeType);
+      if (result) {
+        setTranscript((prev) => [
+          ...prev,
+          {
+            text: result.transcript,
+            timestamp: new Date().toISOString(),
+            language: result.language,
+          },
+        ]);
+      }
     },
-    [sendAudio]
+    [transcribe]
   );
 
   const { isRecording, audioLevel, startContinuousRecording, stopContinuousRecording } =
     useScribeRecording({ onAudioChunk });
-
-  // Connect WebSocket on mount
-  useEffect(() => {
-    connect();
-    return () => {
-      disconnect();
-    };
-  }, [connect, disconnect]);
-
-  // Handle incoming messages
-  useEffect(() => {
-    if (!lastMessage) return;
-
-    if (lastMessage.type === "transcript" && lastMessage.text) {
-      setTranscript((prev) => [
-        ...prev,
-        {
-          text: lastMessage.text!,
-          timestamp: new Date().toISOString(),
-          language: lastMessage.language,
-        },
-      ]);
-    }
-  }, [lastMessage]);
 
   // Auto-scroll transcript
   useEffect(() => {
@@ -108,9 +93,6 @@ export default function ScribeSessionPage({
     // Stop recording
     stopContinuousRecording();
 
-    // Tell server session is ending
-    sendControl("end");
-
     // Run post-session pipeline
     try {
       const res = await apiFetch(`/api/sessions/${sessionId}/complete`, {
@@ -120,21 +102,11 @@ export default function ScribeSessionPage({
       if (res.ok) {
         router.push(`/dashboard/sessions/${sessionId}`);
       } else {
-        // Still navigate — session is saved even if pipeline had issues
         router.push(`/dashboard/sessions/${sessionId}`);
       }
     } catch {
       router.push(`/dashboard/sessions/${sessionId}`);
     }
-  };
-
-  const isReady = connectionState === "connected";
-  const isFailed = connectionState === "timeout" || connectionState === "error";
-
-  const handleRetry = () => {
-    disconnect();
-    // Small delay to let the old connection fully close
-    setTimeout(() => connect(), 300);
   };
 
   return (
@@ -151,19 +123,10 @@ export default function ScribeSessionPage({
               Recording {formatDuration(duration)}
             </Badge>
           )}
-          <Badge
-            variant={
-              connectionState === "connected"
-                ? "default"
-                : connectionState === "connecting"
-                ? "secondary"
-                : isFailed
-                ? "destructive"
-                : "outline"
-            }
-          >
-            {connectionState}
-          </Badge>
+          {isProcessing && (
+            <Badge variant="secondary">Transcribing...</Badge>
+          )}
+          <Badge variant="default">Ready</Badge>
         </div>
       </div>
 
@@ -188,9 +151,7 @@ export default function ScribeSessionPage({
           <div className="max-h-[500px] overflow-y-auto space-y-2">
             {transcript.length === 0 ? (
               <p className="text-gray-400 text-sm text-center py-8">
-                {isFailed
-                  ? "Could not connect to the voice server."
-                  : hasStarted
+                {hasStarted
                   ? "Listening... transcript will appear here"
                   : "Start recording to begin transcription"}
               </p>
@@ -214,26 +175,12 @@ export default function ScribeSessionPage({
 
       {/* Controls */}
       <div className="flex gap-3">
-        {isFailed ? (
-          <>
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => router.push("/dashboard/scribe")}
-            >
-              Back
-            </Button>
-            <Button className="flex-1" onClick={handleRetry}>
-              Retry Connection
-            </Button>
-          </>
-        ) : !hasStarted ? (
+        {!hasStarted ? (
           <Button
             className="flex-1"
-            disabled={!isReady}
             onClick={handleStartRecording}
           >
-            {isReady ? "Start Recording" : "Connecting..."}
+            Start Recording
           </Button>
         ) : !isRecording ? (
           <>

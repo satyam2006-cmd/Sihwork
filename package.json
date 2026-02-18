@@ -8,10 +8,8 @@
     "dev:patient": "npm run dev -w apps/patient",
     "dev:doctor": "npm run dev -w apps/doctor",
     "dev:portal": "npm run dev -w apps/portal",
-    "dev:ws": "tsx watch server/ws-server.ts",
-    "start:ws": "tsx server/production.ts",
-    "dev:all": "concurrently \"npm run dev:patient\" \"npm run dev:doctor\" \"npm run dev:portal\" \"npm run dev:ws\"",
-    "dev:kill": "{ lsof -ti :3000; lsof -ti :3001; lsof -ti :3002; lsof -ti :3003; } 2>/dev/null | sort -u | xargs kill -9 2>/dev/null; echo 'Ports 3000, 3001, 3002, 3003 freed'",
+    "dev:all": "concurrently \"npm run dev:patient\" \"npm run dev:doctor\" \"npm run dev:portal\"",
+    "dev:kill": "{ lsof -ti :3000; lsof -ti :3002; lsof -ti :3003; } 2>/dev/null | sort -u | xargs kill -9 2>/dev/null; echo 'Ports 3000, 3002, 3003 freed'",
     "test:stress-ehr": "tsx tests/stress-ehr.ts",
     "test:stress-conversation": "tsx tests/stress-conversation.ts",
     "test:eval-extraction": "tsx tests/eval-extraction.ts",
@@ -27,7 +25,6 @@
     "test:aci-bench-visualize": "tsx tests/visualize.ts -- --aci-bench"
   },
   "devDependencies": {
-    "@types/ws": "^8.18.1",
     "concurrently": "^9.1.2",
     "hyparquet": "^1.25.0",
     "playwright": "^1.58.2",
@@ -36,7 +33,6 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
-    "dotenv": "^17.3.1",
-    "ws": "^8.19.0"
+    "dotenv": "^17.3.1"
   }
 }

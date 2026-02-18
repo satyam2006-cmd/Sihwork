@@ -1,41 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession, updateSession } from "@mcp/tools/index";
+import { requireAuth } from "@/lib/auth";
+import { getSession } from "@mcp/tools/index";
 import { runPostSessionAgent } from "@mcp/post-session-agent";
 import { hydrateEHRContext, serializeEHRContext } from "@second-opinion/shared";
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id: sessionId } = await params;
+    const [user, authError] = await requireAuth();
+    if (authError) return authError;
 
-    const { session } = await getSession({ session_id: sessionId });
+    // Verify ownership and load session
+    const { session } = await getSession({
+      session_id: sessionId,
+      verify_owner_user_id: user.id,
+    });
 
-    const transcript =
-      (session.transcript as Array<{
-        id: string;
-        role: "user" | "assistant";
-        content: string;
-        timestamp: string;
-      }>) || [];
-
-    if (transcript.length === 0) {
-      // Mark as completed even if empty
-      await updateSession({ session_id: sessionId, complete: true });
-      return NextResponse.json({ success: true, skipped: true });
+    const transcript = (session.transcript as Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: string }>) || [];
+    if (transcript.length < 2) {
+      return NextResponse.json(
+        { error: "Session has insufficient transcript for processing" },
+        { status: 400 }
+      );
     }
 
     const patientId = session.patient_id as string;
-    const sessionMode = session.mode as "text" | "voice" | "scribe";
 
-    // 1. Mark session completed
-    await updateSession({
-      session_id: sessionId,
-      complete: true,
-    });
-
-    // 2. Hydrate EHR context for temporal awareness
+    // Hydrate EHR context for temporal awareness
     let serializedEHR: string | undefined;
     try {
       const ehrContext = await hydrateEHRContext(patientId);
@@ -44,14 +38,8 @@ export async function POST(
       console.error("Failed to hydrate EHR context for post-session:", err);
     }
 
-    // 3. Run the agentic post-session pipeline
-    const result = await runPostSessionAgent(
-      sessionId,
-      patientId,
-      transcript,
-      serializedEHR,
-      sessionMode
-    );
+    // Run full post-session pipeline
+    const result = await runPostSessionAgent(sessionId, patientId, transcript, serializedEHR);
 
     if (result.errors.length > 0) {
       console.error("Post-session agent errors:", result.errors);
@@ -71,7 +59,7 @@ export async function POST(
     if (error instanceof Error && error.message === "Session not found") {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
-    console.error("Post-session pipeline error:", error);
+    console.error("Process session error:", error);
     return NextResponse.json(
       { error: "Pipeline processing failed" },
       { status: 500 }

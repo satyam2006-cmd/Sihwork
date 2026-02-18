@@ -504,6 +504,57 @@ export class ConversationEngine {
   }
 
   /**
+   * Return metadata needed to reconstruct engine state across stateless requests.
+   */
+  getMetadata(): {
+    isEmergency: boolean;
+    emergencyDetails: string | null;
+    sessionNotes: Record<string, unknown>;
+    conversationSummary: string | null;
+  } {
+    return {
+      isEmergency: this.isEmergency,
+      emergencyDetails: this.emergencyDetails,
+      sessionNotes: this.sessionNotes,
+      conversationSummary: this.conversationSummary,
+    };
+  }
+
+  /**
+   * Reconstruct a ConversationEngine from a saved transcript and metadata.
+   * Used for stateless API routes — each request rebuilds the engine from DB state.
+   */
+  static fromTranscript(
+    ehrContext: EHRContext,
+    transcript: ChatMessage[],
+    metadata?: {
+      isEmergency?: boolean;
+      emergencyDetails?: string | null;
+      sessionNotes?: Record<string, unknown>;
+      conversationSummary?: string | null;
+    },
+    callbacks?: ConversationToolCallbacks,
+    options?: ConversationEngineOptions,
+  ): ConversationEngine {
+    const engine = new ConversationEngine(ehrContext, callbacks, options);
+
+    // Rebuild messages from the simplified transcript (text-only)
+    for (const msg of transcript) {
+      engine.messages.push({ role: msg.role, content: msg.content });
+    }
+
+    // Restore metadata
+    if (metadata) {
+      if (metadata.isEmergency) engine.isEmergency = true;
+      if (metadata.emergencyDetails) engine.emergencyDetails = metadata.emergencyDetails;
+      if (metadata.sessionNotes) engine.sessionNotes = metadata.sessionNotes;
+      if (metadata.conversationSummary) engine.conversationSummary = metadata.conversationSummary;
+    }
+
+    return engine;
+  }
+
+  /**
    * Clean up resources. Call when the session is done.
    */
   destroy(): void {

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
-import { getSession, updateSession } from "@mcp/tools/index";
+import { getSession } from "@mcp/tools/index";
+import { textToSpeech } from "@second-opinion/shared";
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -11,26 +12,28 @@ export async function POST(
     const [user, authError] = await requireAuth();
     if (authError) return authError;
 
-    // Verify ownership
+    // Verify session ownership
     await getSession({
       session_id: sessionId,
       verify_owner_user_id: user.id,
     });
 
-    // Mark session as completed
-    await updateSession({
-      session_id: sessionId,
-      complete: true,
-    });
+    const { text, language } = await request.json();
+    if (!text) {
+      return NextResponse.json({ error: "text required" }, { status: 400 });
+    }
 
-    return NextResponse.json({ success: true });
+    const audioBuffer = await textToSpeech(text, language || "en-IN");
+    const base64Audio = audioBuffer.toString("base64");
+
+    return NextResponse.json({ audio: base64Audio });
   } catch (error) {
     if (error instanceof Error && error.message === "Session not found") {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
-    console.error("Complete session error:", error);
+    console.error("Synthesize error:", error);
     return NextResponse.json(
-      { error: "Failed to complete session" },
+      { error: error instanceof Error ? error.message : "Synthesis failed" },
       { status: 500 }
     );
   }

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
-import { getSession, updateSession } from "@mcp/tools/index";
+import { getSession } from "@mcp/tools/index";
+import { speechToText } from "@second-opinion/shared";
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -11,26 +12,29 @@ export async function POST(
     const [user, authError] = await requireAuth();
     if (authError) return authError;
 
-    // Verify ownership
+    // Verify session ownership
     await getSession({
       session_id: sessionId,
       verify_owner_user_id: user.id,
     });
 
-    // Mark session as completed
-    await updateSession({
-      session_id: sessionId,
-      complete: true,
-    });
+    const mimeType = request.headers.get("content-type") || "audio/webm";
+    const arrayBuffer = await request.arrayBuffer();
+    const audioBuffer = Buffer.from(arrayBuffer);
 
-    return NextResponse.json({ success: true });
+    const result = await speechToText(audioBuffer, mimeType);
+
+    return NextResponse.json({
+      transcript: result.transcript,
+      language_code: result.language_code,
+    });
   } catch (error) {
     if (error instanceof Error && error.message === "Session not found") {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
-    console.error("Complete session error:", error);
+    console.error("Transcribe error:", error);
     return NextResponse.json(
-      { error: "Failed to complete session" },
+      { error: error instanceof Error ? error.message : "Transcription failed" },
       { status: 500 }
     );
   }

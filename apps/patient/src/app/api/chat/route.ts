@@ -2,34 +2,10 @@ import { NextRequest } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { getSession, updateSession } from "@mcp/tools/index";
 import { ConversationEngine, hydrateEHRContext, EmergencyScanner } from "@second-opinion/shared";
+import type { ChatMessage } from "@second-opinion/shared";
 
-// In-memory conversation engines per session
-const engines = new Map<string, ConversationEngine>();
-
-// Stateless emergency scanner — shared across all sessions
+// Stateless emergency scanner — shared across all requests
 const emergencyScanner = new EmergencyScanner();
-
-// Periodic cleanup interval (every 5 minutes)
-const STALE_ENGINE_MS = 60 * 60 * 1000; // 1 hour
-let cleanupInterval: ReturnType<typeof setInterval> | null = null;
-
-function ensureCleanup() {
-  if (cleanupInterval) return;
-  cleanupInterval = setInterval(() => {
-    const now = Date.now();
-    for (const [id, engine] of engines) {
-      if (now - engine.getCreatedAt() > STALE_ENGINE_MS) {
-        engine.destroy();
-        engines.delete(id);
-      }
-    }
-    // Stop interval when no engines remain
-    if (engines.size === 0 && cleanupInterval) {
-      clearInterval(cleanupInterval);
-      cleanupInterval = null;
-    }
-  }, 5 * 60 * 1000);
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,31 +17,46 @@ export async function POST(request: NextRequest) {
       return new Response("sessionId required", { status: 400 });
     }
 
-    // Verify session ownership and get patient_id
+    // Verify session ownership and load session data
     const { session } = await getSession({
       session_id: sessionId,
       verify_owner_user_id: user.id,
     });
 
-    const patients = session.patients as unknown as { id: string } | null;
-    const patientId = patients?.id || (session.patient_id as string);
+    const patientId = session.patient_id as string;
+    const transcript = (session.transcript as ChatMessage[]) || [];
+    const metadata = (session.metadata as Record<string, unknown>) || {};
 
-    // Get or create conversation engine
-    let engine = engines.get(sessionId);
-    if (!engine) {
-      const ehrContext = await hydrateEHRContext(patientId);
-      engine = new ConversationEngine(ehrContext, undefined, { useRouter: true });
-      engines.set(sessionId, engine);
-      ensureCleanup();
-    }
+    // Rebuild engine from DB state each request
+    const ehrContext = await hydrateEHRContext(patientId);
+    const engine = ConversationEngine.fromTranscript(
+      ehrContext,
+      transcript,
+      {
+        isEmergency: (metadata.isEmergency as boolean) || false,
+        emergencyDetails: (metadata.emergencyDetails as string) || null,
+        sessionNotes: (metadata.sessionNotes as Record<string, unknown>) || {},
+        conversationSummary: (metadata.conversationSummary as string) || null,
+      },
+      undefined,
+      { useRouter: true },
+    );
 
     // If no message, send greeting
     if (!message) {
       const greeting = await engine.getGreeting();
 
-      // Update transcript in DB via tool
-      const transcript = engine.getTranscript();
-      await updateSession({ session_id: sessionId, transcript });
+      // Save transcript + metadata to DB
+      const updatedTranscript = engine.getTranscript();
+      const updatedMetadata = engine.getMetadata();
+      await updateSession({
+        session_id: sessionId,
+        transcript: updatedTranscript,
+        metadata: {
+          ...metadata,
+          ...updatedMetadata,
+        },
+      });
 
       return new Response(
         JSON.stringify({
@@ -81,14 +72,14 @@ export async function POST(request: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // Fire emergency scanner in parallel (zero added latency — Haiku finishes before Sonnet stream)
-          const currentTranscript = engine!.getTranscript();
+          // Fire emergency scanner in parallel
+          const currentTranscript = engine.getTranscript();
           const scannerPromise = emergencyScanner.scan([
             ...currentTranscript,
             { id: 'pending', role: 'user' as const, content: message, timestamp: new Date().toISOString() },
           ]);
 
-          const generator = engine!.sendMessageStreaming(message);
+          const generator = engine.sendMessageStreaming(message);
 
           for await (const chunk of generator) {
             if (chunk.type === "text") {
@@ -96,20 +87,25 @@ export async function POST(request: NextRequest) {
                 encoder.encode(`data: ${JSON.stringify({ type: "text", content: chunk.content })}\n\n`)
               );
             } else if (chunk.type === "done") {
-              // Await scanner result and merge with main agent's emergency flag
+              // Await scanner result and merge
               const scanResult = await scannerPromise;
               const isEmergency = chunk.isEmergency || scanResult.isEmergency;
               const emergencyDetails = scanResult.isEmergency && !chunk.isEmergency
                 ? JSON.stringify({ source: 'emergency_scanner', ...scanResult })
                 : chunk.emergencyDetails || null;
 
-              // Update transcript via tool
-              const transcript = engine!.getTranscript();
+              // Save updated transcript + metadata to DB
+              const updatedTranscript = engine.getTranscript();
+              const updatedMetadata = engine.getMetadata();
               await updateSession({
                 session_id: sessionId,
-                transcript,
+                transcript: updatedTranscript,
                 emergency_flagged: isEmergency,
                 emergency_details: emergencyDetails,
+                metadata: {
+                  ...metadata,
+                  ...updatedMetadata,
+                },
               });
 
               controller.enqueue(
@@ -152,41 +148,5 @@ export async function POST(request: NextRequest) {
       JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
-  }
-}
-
-/**
- * DELETE handler to clean up a session's engine when the session ends.
- * Called by the frontend when navigating away or ending a consultation.
- */
-export async function DELETE(request: NextRequest) {
-  try {
-    const [user, authError] = await requireAuth();
-    if (authError) return authError;
-
-    const { sessionId } = await request.json();
-    if (!sessionId) {
-      return new Response("sessionId required", { status: 400 });
-    }
-
-    // Verify ownership before cleanup
-    await getSession({
-      session_id: sessionId,
-      verify_owner_user_id: user.id,
-    });
-
-    const engine = engines.get(sessionId);
-    if (engine) {
-      engine.destroy();
-      engines.delete(sessionId);
-    }
-
-    return new Response(JSON.stringify({ ok: true }), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch {
-    return new Response(JSON.stringify({ ok: true }), {
-      headers: { "Content-Type": "application/json" },
-    });
   }
 }

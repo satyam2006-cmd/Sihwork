@@ -32,8 +32,10 @@ export function DashboardShell({ children, userEmail, patientName }: DashboardSh
         <p className="text-muted-foreground text-center max-w-md">
           Your account doesn&apos;t have a patient profile. Please sign out and create a new account.
         </p>
-        <Button variant="outline" onClick={async () => {
-          try { await signOut(); } catch { /* proceed to redirect */ }
+        <Button variant="outline" onClick={() => {
+          // Fire signOut but don't await — redirect immediately
+          // so we don't hang if the Supabase client locks up
+          signOut().catch(() => {});
           window.location.href = "/login";
         }}>Sign Out</Button>
       </div>

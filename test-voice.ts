@@ -3,7 +3,6 @@ config({ path: '.env.local' });
 
 import { textToSpeech } from './packages/shared/src/sarvam/tts';
 import { speechToText } from './packages/shared/src/sarvam/asr';
-import { processUtterance, generateGreetingAudio } from './server/audio-pipeline';
 import { hydrateEHRContext } from './packages/shared/src/ehr/hydration';
 import { ConversationEngine } from './packages/shared/src/claude/conversation-engine';
 
@@ -25,30 +24,27 @@ async function main() {
     console.log(`   ✓ Transcript: "${asrResult.transcript}"`);
     console.log(`   ✓ Language: ${asrResult.language_code}`);
 
-    // Step 3: Test the full audio pipeline (ASR → Claude → TTS)
-    console.log('\n3. Full audio pipeline (ASR → Claude → TTS)...');
+    // Step 3: Test greeting generation
+    console.log('\n3. Greeting generation...');
     const ehrContext = await hydrateEHRContext(PATIENT_ID);
     const engine = new ConversationEngine(ehrContext);
-
-    // Get greeting first
     const greeting = await engine.getGreeting();
     console.log(`   ✓ Greeting: "${greeting.content.substring(0, 80)}..."`);
 
-    // Generate greeting audio
+    // Step 4: Test greeting TTS
     console.log('\n4. Greeting TTS...');
-    const greetingAudio = await generateGreetingAudio(greeting.content, 'en-IN');
-    console.log(`   ✓ Greeting audio: ${greetingAudio ? greetingAudio.length + ' bytes' : 'null (TTS failed)'}`);
+    const greetingAudio = await textToSpeech(greeting.content, 'en-IN');
+    console.log(`   ✓ Greeting audio: ${greetingAudio.length} bytes`);
 
-    // Process utterance: audio → ASR → Claude response → TTS
-    console.log('\n5. processUtterance (audio → ASR → Claude → TTS)...');
-    const result = await processUtterance(audioBuffer, engine, 'en');
-    console.log(`   ✓ User said: "${result.transcript}"`);
-    console.log(`   ✓ Doctor response: "${result.response.substring(0, 100)}..."`);
-    console.log(`   ✓ Response audio: ${result.audioBuffer ? result.audioBuffer.length + ' bytes' : 'null'}`);
-    console.log(`   ✓ Language: ${result.language}`);
-    console.log(`   ✓ Emergency: ${result.isEmergency}`);
+    // Step 5: Full pipeline: ASR → Claude → TTS
+    console.log('\n5. Full pipeline (ASR → Claude → TTS)...');
+    const response = await engine.sendMessage(asrResult.transcript);
+    console.log(`   ✓ Doctor response: "${response.content.substring(0, 100)}..."`);
+    const responseAudio = await textToSpeech(response.content, 'en-IN');
+    console.log(`   ✓ Response audio: ${responseAudio.length} bytes`);
+    console.log(`   ✓ Emergency: ${response.isEmergency}`);
 
-    // Step 4: Test Hindi TTS
+    // Step 6: Test Hindi TTS
     console.log('\n6. Hindi TTS...');
     const hindiText = "मुझे सिरदर्द हो रहा है";
     const hindiAudio = await textToSpeech(hindiText, 'hi-IN');
