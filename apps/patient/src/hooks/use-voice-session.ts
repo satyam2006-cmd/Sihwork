@@ -190,7 +190,11 @@ export function useVoiceSession({
         }
 
         // Step 3: TTS — synthesize response audio
-        const languageCode = language_code === "en" ? "en-IN" : `${language_code}-IN`;
+        const VALID_SARVAM_LANGS = new Set([
+          "bn-IN","en-IN","gu-IN","hi-IN","kn-IN","ml-IN","mr-IN","od-IN","pa-IN","ta-IN","te-IN",
+        ]);
+        const rawLang = language_code === "en" ? "en-IN" : `${language_code}-IN`;
+        const languageCode = VALID_SARVAM_LANGS.has(rawLang) ? rawLang : "en-IN";
         try {
           const ttsRes = await apiFetch(`/api/session/${sessionId}/synthesize`, {
             method: "POST",
