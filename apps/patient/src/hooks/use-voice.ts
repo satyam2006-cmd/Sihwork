@@ -36,6 +36,7 @@ export function useVoice() {
   const chunksRef = useRef<Blob[]>([]);
   const playbackIdRef = useRef(0);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   // Clean up AudioContext on unmount
   useEffect(() => {
@@ -46,6 +47,10 @@ export function useVoice() {
       audioContextRef.current?.close().catch(() => {});
       audioContextRef.current = null;
       // Stop any in-flight playback
+      if (currentSourceRef.current) {
+        try { currentSourceRef.current.stop(); } catch { /* already stopped */ }
+        currentSourceRef.current = null;
+      }
       if (currentAudioRef.current) {
         currentAudioRef.current.pause();
         currentAudioRef.current = null;
@@ -154,6 +159,11 @@ export function useVoice() {
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
       }
+
+      // Resume AudioContext to reset audio session after mic release.
+      // On iOS/Safari, getUserMedia switches the audio session to
+      // "play-and-record" mode; resuming resets it for normal playback.
+      audioContextRef.current?.resume().catch(() => {});
     });
   }, []);
 
@@ -162,21 +172,58 @@ export function useVoice() {
     const thisPlaybackId = ++playbackIdRef.current;
 
     // Stop any currently-playing audio
+    if (currentSourceRef.current) {
+      try { currentSourceRef.current.stop(); } catch { /* already stopped */ }
+      currentSourceRef.current = null;
+    }
     if (currentAudioRef.current) {
       currentAudioRef.current.pause();
       currentAudioRef.current = null;
     }
 
     try {
-      // Use HTML5 Audio element — works on iOS without requiring a user gesture
-      // for each play() call (audio is unlocked after first user interaction).
       const binaryString = atob(base64Audio);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
       }
 
-      // Sarvam TTS returns WAV audio; use generic type so browser auto-detects
+      if (playbackIdRef.current !== thisPlaybackId) return;
+
+      // Primary: AudioContext-based playback.
+      // On iOS Safari, Audio.play() can silently fail after getUserMedia
+      // changes the audio session. AudioContext playback works reliably
+      // once the context has been resumed during a user gesture.
+      try {
+        const audioContext = getAudioContext();
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+        }
+
+        const audioBuffer = await audioContext.decodeAudioData(bytes.buffer.slice(0));
+        if (playbackIdRef.current !== thisPlaybackId) return;
+
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.destination);
+        currentSourceRef.current = source;
+
+        return new Promise<void>((resolve) => {
+          source.onended = () => {
+            if (currentSourceRef.current === source) {
+              currentSourceRef.current = null;
+            }
+            resolve();
+          };
+          source.start(0);
+        });
+      } catch {
+        // decodeAudioData can fail on some browsers — fall through to Audio element
+      }
+
+      if (playbackIdRef.current !== thisPlaybackId) return;
+
+      // Fallback: HTML5 Audio element (works on desktop browsers)
       const blob = new Blob([bytes], { type: "audio/wav" });
       const url = URL.createObjectURL(blob);
 
@@ -204,7 +251,7 @@ export function useVoice() {
     } catch (error) {
       console.error("Failed to play audio:", error);
     }
-  }, []);
+  }, [getAudioContext]);
 
   return {
     isRecording,

@@ -134,6 +134,24 @@ export function useVoiceSession({
         const decoder = new TextDecoder();
         let buffer = "";
 
+        const processSSELine = (line: string) => {
+          if (!line.startsWith("data: ")) return;
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === "text") {
+              assistantText += event.content;
+            } else if (event.type === "done") {
+              assistantText = event.content || assistantText;
+              chatIsEmergency = event.isEmergency || false;
+              chatEmergencyDetails = event.emergencyDetails || null;
+            } else if (event.type === "error") {
+              console.error("Chat SSE error event:", event.content);
+            }
+          } catch {
+            // Skip malformed SSE lines
+          }
+        };
+
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -143,20 +161,14 @@ export function useVoiceSession({
           buffer = lines.pop() || "";
 
           for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            try {
-              const event = JSON.parse(line.slice(6));
-              if (event.type === "text") {
-                assistantText += event.content;
-              } else if (event.type === "done") {
-                assistantText = event.content || assistantText;
-                chatIsEmergency = event.isEmergency || false;
-                chatEmergencyDetails = event.emergencyDetails || null;
-              }
-            } catch {
-              // Skip malformed SSE lines
-            }
+            processSSELine(line);
           }
+        }
+
+        // Flush decoder and process any remaining buffered data
+        buffer += decoder.decode();
+        if (buffer.trim()) {
+          processSSELine(buffer);
         }
 
         if (!assistantText) {
@@ -195,13 +207,17 @@ export function useVoiceSession({
               updateState("speaking");
               try {
                 await playAudio(audio);
-              } catch {
-                // Audio playback failed
+              } catch (playErr) {
+                console.error("Audio playback failed:", playErr);
               }
+            } else {
+              console.error("TTS returned OK but no audio data");
             }
+          } else {
+            console.error("TTS synthesis failed:", ttsRes.status, await ttsRes.text().catch(() => ""));
           }
-        } catch {
-          // TTS failed — text-only fallback
+        } catch (ttsErr) {
+          console.error("TTS request error:", ttsErr);
         }
 
         if (stateRef.current === "speaking" || stateRef.current === "processing") {
