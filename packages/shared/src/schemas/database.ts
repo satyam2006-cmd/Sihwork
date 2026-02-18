@@ -34,7 +34,7 @@ export const SessionSchema = z.object({
   id: z.string().uuid(),
   patient_id: z.string().uuid(),
   status: z.enum(['active', 'completed', 'abandoned']),
-  mode: z.enum(['text', 'voice']),
+  mode: z.enum(['text', 'voice', 'scribe']),
   language: z.string().default('en'),
   transcript: z.array(z.any()).default([]),
   emergency_flagged: z.boolean().default(false),

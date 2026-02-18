@@ -83,10 +83,10 @@ export function RecentSessions({ initialSessions }: { initialSessions: Session[]
             {sessions.map((session) => (
               <div key={session.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-accent transition-colors duration-150">
                 <Link href={`/dashboard/session/${session.id}`} className="flex items-center gap-3 min-w-0 flex-1">
-                  <span>{session.mode === "voice" ? "\uD83C\uDFA4" : "\uD83D\uDCAC"}</span>
+                  <span>{session.mode === "voice" ? "\uD83C\uDFA4" : session.mode === "scribe" ? "\uD83C\uDFE5" : "\uD83D\uDCAC"}</span>
                   <div>
                     <p className="text-sm font-medium">
-                      {session.mode === "voice" ? "Voice" : "Text"} Consultation
+                      {session.mode === "voice" ? "Voice Consultation" : session.mode === "scribe" ? "Clinic Visit" : "Text Consultation"}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {new Date(session.started_at).toLocaleDateString()}

@@ -78,10 +78,10 @@ export function SessionsList({ initialSessions }: { initialSessions: Session[] }
               className="flex items-center justify-between px-4 py-3 hover:bg-accent/60 transition-colors duration-150"
             >
               <Link href={`/dashboard/session/${session.id}`} className="flex items-center gap-3 min-w-0 flex-1">
-                <span className="text-lg">{session.mode === "voice" ? "\uD83C\uDFA4" : "\uD83D\uDCAC"}</span>
+                <span className="text-lg">{session.mode === "voice" ? "\uD83C\uDFA4" : session.mode === "scribe" ? "\uD83C\uDFE5" : "\uD83D\uDCAC"}</span>
                 <div className="min-w-0">
                   <p className="text-sm font-medium">
-                    {session.mode === "voice" ? "Voice" : "Text"} Consultation
+                    {session.mode === "voice" ? "Voice Consultation" : session.mode === "scribe" ? "Clinic Visit" : "Text Consultation"}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {new Date(session.started_at).toLocaleDateString(undefined, {

@@ -78,9 +78,9 @@ export default function ConsultationPage() {
                 <Link key={session.id} href={`/dashboard/session/${session.id}`} className="flex items-center justify-between p-2.5 rounded-lg bg-card hover:bg-accent transition-colors duration-150">
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-2">
-                      <span>{session.mode === "voice" ? "\uD83C\uDFA4" : "\uD83D\uDCAC"}</span>
+                      <span>{session.mode === "voice" ? "\uD83C\uDFA4" : session.mode === "scribe" ? "\uD83C\uDFE5" : "\uD83D\uDCAC"}</span>
                       <span className="text-sm font-medium">
-                        {session.mode === "voice" ? "Voice" : "Text"} Consultation
+                        {session.mode === "voice" ? "Voice Consultation" : session.mode === "scribe" ? "Clinic Visit" : "Text Consultation"}
                       </span>
                       <span className="text-xs text-muted-foreground">
                         started {new Date(session.started_at).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}
