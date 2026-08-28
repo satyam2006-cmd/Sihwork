@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Upload, FileText, Calendar, ChevronRight, Check, AlertCircle, Eye } from 'lucide-react';
 import { ScannedDoc, TimelineEvent } from '../types/medical';
+import { extractTextFromImage } from '../utils/ocr';
 
 interface ScanSectionProps {
   onScanComplete: (scannedDocs: ScannedDoc[], timeline: TimelineEvent[]) => void;
@@ -97,16 +98,20 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
 }) => {
   const [docs, setDocs] = useState<ScannedDoc[]>(existingDocs);
   const [timeline, setTimeline] = useState<TimelineEvent[]>(existingTimeline);
-  
+
   // Animation states
   const [isScanning, setIsScanning] = useState(false);
   const [scanningDocName, setScanningDocName] = useState('');
   const [previewDoc, setPreviewDoc] = useState<ScannedDoc | null>(null);
 
-  // Trigger simulated scanning flow
+  // Real OCR upload states
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [ocrProgress, setOcrProgress] = useState(0);
+
+  // Trigger simulated scanning flow (demo presets, unchanged)
   const handlePresetSelect = (presetKey: keyof typeof PRESET_DOCUMENTS) => {
     const selected = PRESET_DOCUMENTS[presetKey];
-    
+
     // Check if already added to avoid duplicates
     if (docs.some(d => d.name === selected.name)) {
       alert("This document is already uploaded and digitized!");
@@ -118,7 +123,7 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
 
     setTimeout(() => {
       setIsScanning(false);
-      
+
       const newDocId = `doc-${Date.now()}`;
       const newDoc: ScannedDoc = {
         id: newDocId,
@@ -143,9 +148,9 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
       };
 
       const updatedDocs = [...docs, newDoc];
-      
+
       // Sort timeline chronologically (latest first)
-      const updatedTimeline = [...timeline, newTimelineEvent].sort((a, b) => 
+      const updatedTimeline = [...timeline, newTimelineEvent].sort((a, b) =>
         new Date(b.date).getTime() - new Date(a.date).getTime()
       );
 
@@ -153,6 +158,60 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
       setTimeline(updatedTimeline);
       setPreviewDoc(newDoc);
     }, 2200); // 2.2 seconds scan animation
+  };
+
+  // NEW: Handles a real file selected by the user and runs live Tesseract OCR on it
+  const handleRealFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (docs.some(d => d.name === file.name)) {
+      alert("This document is already uploaded and digitized!");
+      e.target.value = '';
+      return;
+    }
+
+    setIsScanning(true);
+    setScanningDocName(file.name);
+    setOcrProgress(0);
+
+    try {
+      const extractedText = await extractTextFromImage(file, setOcrProgress);
+
+      const newDocId = `doc-${Date.now()}`;
+      const newDoc: ScannedDoc = {
+        id: newDocId,
+        name: file.name,
+        type: 'prescription', // default classification; real OCR doesn't auto-detect doc type yet
+        uploadedAt: new Date().toLocaleDateString(),
+        rawText: extractedText || '(No text detected — try a clearer image)',
+        structuredData: {}, // raw text only for real uploads; structured table stays empty
+      };
+
+      const newTimelineEvent: TimelineEvent = {
+        id: `tl-${Date.now()}`,
+        date: new Date().toISOString().split('T')[0],
+        title: file.name,
+        description: 'Digitized via live OCR upload.',
+        type: 'prescription',
+        sourceId: newDocId,
+      };
+
+      const updatedDocs = [...docs, newDoc];
+      const updatedTimeline = [...timeline, newTimelineEvent].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+
+      setDocs(updatedDocs);
+      setTimeline(updatedTimeline);
+      setPreviewDoc(newDoc);
+    } catch (err) {
+      console.error('OCR failed:', err);
+      alert('OCR failed to process this file. Try a clearer/printed document.');
+    } finally {
+      setIsScanning(false);
+      e.target.value = ''; // allows re-uploading a file with the same name later
+    }
   };
 
   const handleNext = () => {
@@ -173,12 +232,22 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
         {/* Left Side: Upload zone and presets */}
         <div>
           <h3 style={{ marginBottom: '0.75rem' }}>Upload History Records</h3>
-          
-          {/* Uploader Box */}
-          <div style={uploaderBoxStyle}>
+
+          {/* Uploader Box — now clickable, triggers real Tesseract OCR */}
+          <div
+            style={uploaderBoxStyle}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={handleRealFileUpload}
+            />
             <Upload size={32} style={{ marginBottom: '0.5rem' }} />
-            <div style={{ fontWeight: '700' }}>Drag & Drop Prior Records</div>
-            <div style={{ fontSize: '0.75rem', color: '#555', marginTop: '0.2rem' }}>Prescriptions, Lab PDFs, or Discharge papers</div>
+            <div style={{ fontWeight: '700' }}>Click to Upload Prior Records</div>
+            <div style={{ fontSize: '0.75rem', color: '#555', marginTop: '0.2rem' }}>Printed prescriptions, lab PDFs (as image)</div>
             <div style={{ marginTop: '0.75rem', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: '800', backgroundColor: '#EEE', padding: '0.2rem 0.5rem', border: '1px solid #1E1E1E' }}>
               OR SELECT DEMO TEMPLATES BELOW
             </div>
@@ -186,25 +255,25 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
 
           {/* Quick Demo Templates */}
           <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <button 
-              onClick={() => handlePresetSelect('prescription')} 
-              className="neo-btn btn-white" 
+            <button
+              onClick={() => handlePresetSelect('prescription')}
+              className="neo-btn btn-white"
               style={presetBtnStyle}
               disabled={isScanning}
             >
               <FileText size={18} /> Load Dr. Verma Prescription (Handwritten) <ChevronRight size={16} />
             </button>
-            <button 
-              onClick={() => handlePresetSelect('lab_report')} 
-              className="neo-btn btn-white" 
+            <button
+              onClick={() => handlePresetSelect('lab_report')}
+              className="neo-btn btn-white"
               style={presetBtnStyle}
               disabled={isScanning}
             >
               <FileText size={18} /> Load Thyrocare Renal Lab Report <ChevronRight size={16} />
             </button>
-            <button 
-              onClick={() => handlePresetSelect('discharge')} 
-              className="neo-btn btn-white" 
+            <button
+              onClick={() => handlePresetSelect('discharge')}
+              className="neo-btn btn-white"
               style={presetBtnStyle}
               disabled={isScanning}
             >
@@ -215,14 +284,17 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
 
         {/* Right Side: Scan Status / Real-time Digitizer */}
         <div className="neo-card" style={{ backgroundColor: '#F9FAFB', border: '2px solid #1E1E1E', padding: '1rem', boxShadow: 'none', minHeight: '350px' }}>
-          
+
           {/* Active scanning state animation */}
           {isScanning && (
             <div style={scannerLoadingContainer}>
               <div style={scanningLaserBeam} />
               <FileText size={48} className="animate-pulse-slow" style={{ color: '#C084FC', marginBottom: '1rem' }} />
-              <h4 style={{ fontFamily: 'var(--font-display)' }}>OCR DIGITIZING HANDWRITING...</h4>
-              <p style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>Running segmenter and table parser on {scanningDocName}</p>
+              <h4 style={{ fontFamily: 'var(--font-display)' }}>OCR DIGITIZING...</h4>
+              <p style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
+                Running segmenter and table parser on {scanningDocName}
+                {ocrProgress > 0 && ocrProgress < 100 ? ` (${ocrProgress}%)` : ''}
+              </p>
             </div>
           )}
 
@@ -233,7 +305,7 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
                 <span className="neo-badge badge-green" style={{ fontSize: '0.65rem' }}>OCR SUCCESSFUL</span>
                 <span style={{ fontWeight: '700', fontSize: '0.85rem', maxWidth: '65%', overflow: 'hidden', textOverflow: 'ellipsis' }}>{previewDoc.name}</span>
               </div>
-              
+
               {/* Prescriptions View */}
               {previewDoc.type === 'prescription' && previewDoc.structuredData.medications && (
                 <div>
@@ -317,8 +389,23 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
                 </div>
               )}
 
+              {/* Fallback: real-upload docs with no structuredData at all — just show raw text prominently */}
+              {previewDoc.structuredData &&
+                !previewDoc.structuredData.medications &&
+                !previewDoc.structuredData.metrics &&
+                previewDoc.type !== 'discharge_summary' && (
+                <div style={{ fontSize: '0.8rem', color: '#444' }}>
+                  No structured fields parsed yet for this upload — see raw OCR text below.
+                </div>
+              )}
+
               {/* Toggle to see Raw Plain Text OCR Output */}
-              <details style={{ marginTop: '0.75rem' }}>
+              <details style={{ marginTop: '0.75rem' }} open={
+                previewDoc.structuredData &&
+                !previewDoc.structuredData.medications &&
+                !previewDoc.structuredData.metrics &&
+                previewDoc.type !== 'discharge_summary'
+              }>
                 <summary style={{ cursor: 'pointer', fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase' }}>
                   <Eye size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> View Raw OCR Stream
                 </summary>
@@ -332,7 +419,7 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
               <AlertCircle size={28} style={{ color: 'var(--color-gray)', marginBottom: '0.5rem' }} />
               <h4>Pending Digitization</h4>
               <p style={{ fontSize: '0.75rem', color: '#666', textAlign: 'center', maxWidth: '80%', marginTop: '0.2rem' }}>
-                Select a document preset on the left to start real-time digital OCR text extraction.
+                Upload a real document or select a demo preset on the left to start digitization.
               </p>
             </div>
           )}
@@ -348,9 +435,9 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
 
           <div style={timelineContainer}>
             {timeline.map((event) => (
-              <div 
-                key={event.id} 
-                style={timelineItemStyle} 
+              <div
+                key={event.id}
+                style={timelineItemStyle}
                 onClick={() => {
                   const matchingDoc = docs.find(d => d.id === event.sourceId);
                   if (matchingDoc) setPreviewDoc(matchingDoc);
@@ -360,13 +447,13 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
                 <div style={timelineBulletStyle}>
                   <Check size={12} style={{ color: '#FFF' }} />
                 </div>
-                
+
                 {/* Timeline content block (Neobrutalist card tiny) */}
-                <div 
-                  className="neo-card hoverable" 
-                  style={{ 
-                    margin: 0, 
-                    padding: '0.5rem 0.75rem', 
+                <div
+                  className="neo-card hoverable"
+                  style={{
+                    margin: 0,
+                    padding: '0.5rem 0.75rem',
                     boxShadow: '2px 2px 0px #1E1E1E',
                     cursor: 'pointer',
                     backgroundColor: event.type === 'prescription' ? '#A3E635' : event.type === 'lab_report' ? '#FFE800' : '#FF8E9E'
@@ -384,8 +471,8 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
 
       {/* Actions */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem', borderTop: '3px solid #1E1E1E', paddingTop: '1rem' }}>
-        <button 
-          onClick={handleNext} 
+        <button
+          onClick={handleNext}
           className="neo-btn btn-yellow"
           disabled={docs.length === 0}
           style={{ padding: '0.85rem 2rem' }}
