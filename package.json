@@ -1,38 +1,29 @@
 {
+  "name": "sihwork-medical-ai",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "version": "1.0.0",
+  "type": "module",
   "scripts": {
-    "dev:patient": "npm run dev -w apps/patient",
-    "dev:doctor": "npm run dev -w apps/doctor",
-    "dev:portal": "npm run dev -w apps/portal",
-    "dev:all": "concurrently \"npm run dev:patient\" \"npm run dev:doctor\" \"npm run dev:portal\"",
-    "dev:kill": "{ lsof -ti :3000; lsof -ti :3002; lsof -ti :3003; } 2>/dev/null | sort -u | xargs kill -9 2>/dev/null; echo 'Ports 3000, 3002, 3003 freed'",
-    "test:stress-ehr": "tsx tests/stress-ehr.ts",
-    "test:stress-conversation": "tsx tests/stress-conversation.ts",
-    "test:eval-extraction": "tsx tests/eval-extraction.ts",
-    "test:seed": "tsx tests/seed-synthea.ts",
-    "test:benchmark": "tsx tests/benchmark.ts",
-    "test:visualize": "tsx tests/visualize.ts",
-    "test:benchmark-and-visualize": "tsx tests/benchmark.ts && tsx tests/visualize.ts",
-    "test:medagentbench": "tsx tests/medagentbench.ts",
-    "test:medagentbench-visualize": "tsx tests/visualize.ts -- --medagentbench",
-    "test:medxpertqa": "tsx tests/medxpertqa.ts",
-    "test:medxpertqa-visualize": "tsx tests/visualize.ts -- --medxpertqa",
-    "test:aci-bench": "tsx tests/aci-bench.ts",
-    "test:aci-bench-visualize": "tsx tests/visualize.ts -- --aci-bench"
-  },
-  "devDependencies": {
-    "concurrently": "^9.1.2",
-    "hyparquet": "^1.25.0",
-    "playwright": "^1.58.2",
-    "tsx": "^4.19.3",
-    "typescript": "^5.7.3"
+    "dev": "vite",
+    "server": "node server.js",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.26.0",
-    "dotenv": "^17.3.1"
+    "lucide-react": "^0.475.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "puppeteer": "^25.9.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0"
   }
 }
