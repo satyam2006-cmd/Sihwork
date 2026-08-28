@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Upload, FileText, Calendar, ChevronRight, Check, AlertCircle, Eye } from 'lucide-react';
-import { ScannedDoc, TimelineEvent } from '../types/medical';
-import { extractTextFromImage } from '../utils/ocr';
+import React, { useState, useCallback } from 'react';
+import { Upload, FileText, Calendar, ChevronRight, Check, Eye, Copy, Camera, PenTool, Type, Pin, Trash2, Image, Sparkles } from 'lucide-react';
+import { DocumentType, ScannedDoc, TimelineEvent } from '../types/medical';
+import { extractTextFromImage, createImagePreview } from '../utils/ocr';
+import { callLocalGemma } from '../utils/ai';
 
 interface ScanSectionProps {
   onScanComplete: (scannedDocs: ScannedDoc[], timeline: TimelineEvent[]) => void;
@@ -9,87 +10,27 @@ interface ScanSectionProps {
   existingTimeline: TimelineEvent[];
 }
 
-// Preset documents to simulate high-fidelity OCR scanning
-const PRESET_DOCUMENTS = {
-  prescription: {
-    name: "Prescription_Dr_Verma_May2026.jpg",
-    type: "prescription" as const,
-    rawText: `Dr. A. K. Verma, MD (Medicine)
-Reg No: 54321 - Metro Health Clinic
-Date: 12-May-2026
+// Keep note color classes for variety
+const KEEP_COLORS = ['', 'keep-coral', 'keep-mint', 'keep-fog', 'keep-lavender', 'keep-sand', 'keep-sage', 'keep-blossom', 'keep-peach'];
 
-Rx:
-1. Tab. Metformin 500mg ---- OD (Once Daily) after dinner --- 3 months (Diabetes)
-2. Tab. Atorvastatin 20mg -- HS (At bed time) --- 1 month (Cholesterol)
-3. Tab. Telmisartan 40mg -- OD (Morning) --- 6 months (HTN)
-
-Note: Check renal profile and HbA1c in 2 months.
-Signature: [Dr. Verma]`,
-    structuredData: {
-      medications: [
-        { name: "Metformin", dosage: "500mg", frequency: "Once Daily (After dinner)", duration: "3 months" },
-        { name: "Atorvastatin", dosage: "20mg", frequency: "At bed time", duration: "1 month" },
-        { name: "Telmisartan", dosage: "40mg", frequency: "Once Daily (Morning)", duration: "6 months" }
-      ],
-      doctorName: "Dr. A. K. Verma",
-      clinicName: "Metro Health Clinic"
-    },
-    date: "2026-05-12"
-  },
-  lab_report: {
-    name: "LabReport_Thyrocare_July2026.pdf",
-    type: "lab_report" as const,
-    rawText: `THYROCARE DIAGNOSTICS
-PATIENT ID: P-887413 | DATE: 15-July-2026
-TEST: RENAL FUNCTION & LIPID PANEL
-
-TEST NAME             VALUE         UNIT       REFERENCE RANGE
-Serum Creatinine      1.80          mg/dL      0.60 - 1.20   [HIGH]
-Blood Urea Nitrogen   28            mg/dL      7 - 20        [HIGH]
-Total Cholesterol     245           mg/dL      125 - 200     [HIGH]
-Triglycerides         185           mg/dL      < 150         [HIGH]
-eGFR                  52            ml/min     > 90          [LOW]
-
-Report Status: Final Authorized Signatory`,
-    structuredData: {
-      metrics: [
-        { name: "Serum Creatinine", value: "1.80 mg/dL", range: "0.60 - 1.20 mg/dL", status: "high" as const },
-        { name: "Blood Urea Nitrogen (BUN)", value: "28 mg/dL", range: "7 - 20 mg/dL", status: "high" as const },
-        { name: "Total Cholesterol", value: "245 mg/dL", range: "125 - 200 mg/dL", status: "high" as const },
-        { name: "eGFR", value: "52 ml/min", range: "> 90 ml/min", status: "low" as const }
-      ],
-      clinicName: "Thyrocare Diagnostics"
-    },
-    date: "2026-07-15"
-  },
-  discharge: {
-    name: "DischargeSummary_MaxHospital_Jan2026.pdf",
-    type: "discharge_summary" as const,
-    rawText: `MAX SUPERSPECIALITY CLINIC
-DISCHARGE SUMMARY
-Patient Name: Patient Demo | Age: 45 yrs
-Date of Admission: 10-Jan-2026 | Date of Discharge: 12-Jan-2026
-
-DIAGNOSIS: Acute Gastroenteritis with severe dehydration
-
-CLINICAL COURSE: Patient presented with vomiting and watery stools. Dehydration treated with IV fluids (NS 1.5L). Stabilized over 48 hours. Vitals at discharge: BP 120/80, Pulse 76/min, afebrile.
-
-DISCHARGE MEDICATIONS:
-- Cap. Ofloxacin 200mg + Ornidazole 500mg --- BD for 5 days.
-- ORS sachet as required.
-
-Consultant: Dr. Neha Sen, Gastroenterology`,
-    structuredData: {
-      diagnosis: "Acute Gastroenteritis with severe dehydration",
-      doctorName: "Dr. Neha Sen",
-      clinicName: "Max Superspeciality Clinic",
-      admitDate: "2026-01-10",
-      dischargeDate: "2026-01-12",
-      keyFindings: ["Severe dehydration", "Treated with 1.5L IV Normal Saline", "Discharged stable"]
-    },
-    date: "2026-01-12"
+const guessDocumentType = (fileName: string): DocumentType => {
+  const lower = fileName.toLowerCase();
+  if (lower.includes('lab') || lower.includes('report') || lower.includes('blood') || lower.includes('mri') || lower.includes('ct') || lower.includes('xray')) {
+    return 'lab_report';
   }
+  if (lower.includes('discharge') || lower.includes('summary')) {
+    return 'discharge_summary';
+  }
+  return 'prescription';
 };
+
+// Extended ScannedDoc with image preview for Keep notes
+interface KeepNote {
+  doc: ScannedDoc;
+  imagePreview?: string; // data URL for uploaded image thumbnail
+  isPinned: boolean;
+  colorClass: string;
+}
 
 export const ScanSection: React.FC<ScanSectionProps> = ({
   onScanComplete,
@@ -98,76 +39,54 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
 }) => {
   const [docs, setDocs] = useState<ScannedDoc[]>(existingDocs);
   const [timeline, setTimeline] = useState<TimelineEvent[]>(existingTimeline);
+  const [keepNotes, setKeepNotes] = useState<KeepNote[]>([]);
 
   // Animation states
   const [isScanning, setIsScanning] = useState(false);
   const [scanningDocName, setScanningDocName] = useState('');
   const [previewDoc, setPreviewDoc] = useState<ScannedDoc | null>(null);
 
-  // Real OCR upload states
+  // Google Keep OCR states
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const cameraInputRef = React.useRef<HTMLInputElement>(null);
   const [ocrProgress, setOcrProgress] = useState(0);
+  const [isHandwritingMode, setIsHandwritingMode] = useState(true);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const [copiedNoteId, setCopiedNoteId] = useState<string | null>(null);
+  const [loadingGemmaNoteId, setLoadingGemmaNoteId] = useState<string | null>(null);
 
-  // Trigger simulated scanning flow (demo presets, unchanged)
-  const handlePresetSelect = (presetKey: keyof typeof PRESET_DOCUMENTS) => {
-    const selected = PRESET_DOCUMENTS[presetKey];
+  // Drag & Drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(true);
+  }, []);
 
-    // Check if already added to avoid duplicates
-    if (docs.some(d => d.name === selected.name)) {
-      alert("This document is already uploaded and digitized!");
-      return;
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragActive(false);
+    const files = e.dataTransfer.files;
+    if (files?.[0]) {
+      processFileUpload(files[0]);
     }
+  }, [docs, isHandwritingMode]);
 
-    setIsScanning(true);
-    setScanningDocName(selected.name);
-
-    setTimeout(() => {
-      setIsScanning(false);
-
-      const newDocId = `doc-${Date.now()}`;
-      const newDoc: ScannedDoc = {
-        id: newDocId,
-        name: selected.name,
-        type: selected.type,
-        uploadedAt: new Date().toLocaleDateString(),
-        rawText: selected.rawText,
-        structuredData: selected.structuredData
-      };
-
-      const newTimelineEvent: TimelineEvent = {
-        id: `tl-${Date.now()}`,
-        date: selected.date,
-        title: selected.type === 'prescription' ? "Dr. Verma Prescription"
-             : selected.type === 'lab_report' ? "Thyrocare Renal Panel"
-             : "Max Hospital Discharge",
-        description: selected.type === 'prescription' ? "3 chronic medications extracted."
-                   : selected.type === 'lab_report' ? "Creatinine levels high (1.80 mg/dL)"
-                   : "Acute Gastroenteritis admission.",
-        type: selected.type,
-        sourceId: newDocId
-      };
-
-      const updatedDocs = [...docs, newDoc];
-
-      // Sort timeline chronologically (latest first)
-      const updatedTimeline = [...timeline, newTimelineEvent].sort((a, b) =>
-        new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-
-      setDocs(updatedDocs);
-      setTimeline(updatedTimeline);
-      setPreviewDoc(newDoc);
-    }, 2200); // 2.2 seconds scan animation
-  };
-
-  // NEW: Handles a real file selected by the user and runs live Tesseract OCR on it
-  const handleRealFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  // Process uploaded file through OCR
+  const processFileUpload = async (file: File) => {
     if (docs.some(d => d.name === file.name)) {
       alert("This document is already uploaded and digitized!");
-      e.target.value = '';
       return;
     }
 
@@ -176,25 +95,82 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
     setOcrProgress(0);
 
     try {
-      const extractedText = await extractTextFromImage(file, setOcrProgress);
+      // Generate image preview for the Keep note
+      let imagePreview: string | undefined;
+      if (file.type.startsWith('image/')) {
+        imagePreview = await createImagePreview(file);
+      }
+      const filePreview = URL.createObjectURL(file);
+      const documentType = guessDocumentType(file.name);
+
+      let extractedText = '';
+      let gemmaSummary: string | undefined;
+      let ocrConfidence: number | undefined;
+      let handwrittenConfidence: number | undefined;
+      const sourceKind = isHandwritingMode ? 'handwritten_gemma' : file.type.startsWith('image/') ? 'printed_ocr' : 'uploaded_file';
+
+      if (isHandwritingMode) {
+        setOcrProgress(50);
+        if (imagePreview) {
+          const result = await callLocalGemma(imagePreview);
+          extractedText = result.text;
+          handwrittenConfidence = result.confidence;
+        } else {
+          extractedText = 'Handwritten PDF/report attached for doctor review. Upload an image photo for handwritten text extraction.';
+          handwrittenConfidence = 0;
+        }
+        setOcrProgress(100);
+      } else if (file.type.startsWith('image/')) {
+        const result = await extractTextFromImage(file, setOcrProgress);
+        extractedText = result.text;
+        ocrConfidence = result.confidence;
+
+        if (imagePreview && (!extractedText || extractedText.trim().length < 15)) {
+          const gemmaResult = await callLocalGemma(imagePreview, extractedText);
+          gemmaSummary = gemmaResult.text;
+          handwrittenConfidence = gemmaResult.confidence;
+        }
+      } else {
+        extractedText = 'PDF/report attached for doctor review. Printed OCR currently runs on image uploads only.';
+        ocrConfidence = 0;
+        setOcrProgress(100);
+      }
 
       const newDocId = `doc-${Date.now()}`;
       const newDoc: ScannedDoc = {
         id: newDocId,
         name: file.name,
-        type: 'prescription', // default classification; real OCR doesn't auto-detect doc type yet
+        type: documentType,
         uploadedAt: new Date().toLocaleDateString(),
         rawText: extractedText || '(No text detected — try a clearer image)',
-        structuredData: {}, // raw text only for real uploads; structured table stays empty
+        imagePreview,
+        filePreview,
+        mimeType: file.type,
+        sourceKind,
+        ocrConfidence,
+        handwrittenConfidence,
+        gemmaSummary,
+        structuredData: {},
       };
 
       const newTimelineEvent: TimelineEvent = {
         id: `tl-${Date.now()}`,
         date: new Date().toISOString().split('T')[0],
         title: file.name,
-        description: 'Digitized via live OCR upload.',
-        type: 'prescription',
+        description: isHandwritingMode
+          ? `Handwritten analysis via local vision model. Confidence: ${handwrittenConfidence ?? 0}%.`
+          : `Printed OCR. Confidence: ${ocrConfidence ?? 0}%.`,
+        type: documentType,
         sourceId: newDocId,
+      };
+
+      // Create Keep note card
+      const colorIndex = (keepNotes.length + 1) % KEEP_COLORS.length;
+      const newKeepNote: KeepNote = {
+        doc: newDoc,
+        imagePreview,
+        isPinned: false,
+        colorClass: KEEP_COLORS[colorIndex],
       };
 
       const updatedDocs = [...docs, newDoc];
@@ -204,19 +180,92 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
 
       setDocs(updatedDocs);
       setTimeline(updatedTimeline);
+      setKeepNotes(prev => [...prev, newKeepNote]);
       setPreviewDoc(newDoc);
     } catch (err) {
       console.error('OCR failed:', err);
-      alert('OCR failed to process this file. Try a clearer/printed document.');
+      alert('OCR failed to process this file. Try a clearer image of the document.');
     } finally {
       setIsScanning(false);
-      e.target.value = ''; // allows re-uploading a file with the same name later
     }
+  };
+
+  // File input change handler
+  const handleRealFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await processFileUpload(file);
+    e.target.value = '';
+  };
+
+  // Keep note actions
+  const handleGemmaCheck = async (noteId: string) => {
+    const note = keepNotes.find(n => n.doc.id === noteId);
+    if (!note) return;
+
+    setLoadingGemmaNoteId(noteId);
+
+    try {
+      const imgToUse = note.imagePreview || "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+      const result = await callLocalGemma(imgToUse, note.doc.rawText);
+
+      // Update keepNotes
+      setKeepNotes(prev => prev.map(n =>
+        n.doc.id === noteId ? { ...n, doc: { ...n.doc, gemmaSummary: result.text } } : n
+      ));
+      // Update docs
+      setDocs(prev => prev.map(d =>
+        d.id === noteId ? { ...d, gemmaSummary: result.text } : d
+      ));
+      
+      // Update previewDoc if active
+      if (previewDoc?.id === noteId) {
+        setPreviewDoc(prev => prev ? { ...prev, gemmaSummary: result.text } : null);
+      }
+      
+      if (result.isSimulated) {
+        alert("Ollama (local GLM-OCR) offline. Showing simulated GLM double-check summary.");
+      } else {
+        alert("GLM-OCR local analysis completed successfully!");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to run local GLM-OCR check.");
+    } finally {
+      setLoadingGemmaNoteId(null);
+    }
+  };
+
+  const handleCopyText = (noteId: string, text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedNoteId(noteId);
+      setTimeout(() => setCopiedNoteId(null), 1200);
+    });
+  };
+
+  const handleTogglePin = (noteId: string) => {
+    setKeepNotes(prev => prev.map(n =>
+      n.doc.id === noteId ? { ...n, isPinned: !n.isPinned } : n
+    ));
+  };
+
+  const handleDeleteNote = (noteId: string) => {
+    setKeepNotes(prev => prev.filter(n => n.doc.id !== noteId));
+    setDocs(prev => prev.filter(d => d.id !== noteId));
+    setTimeline(prev => prev.filter(t => t.sourceId !== noteId));
+    if (previewDoc?.id === noteId) setPreviewDoc(null);
   };
 
   const handleNext = () => {
     onScanComplete(docs, timeline);
   };
+
+  // Sort notes: pinned first
+  const sortedNotes = [...keepNotes].sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+    return 0;
+  });
 
   return (
     <div className="neo-card" style={{ border: '3px solid #1E1E1E' }}>
@@ -226,84 +275,117 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
           <span className="neo-badge badge-pink" style={{ marginRight: '0.5rem' }}>STEP 3</span>
           <span style={{ fontSize: '1.25rem', fontWeight: '800', fontFamily: 'var(--font-display)' }}>DIGITIZE & TIMELINE RECORDS</span>
         </div>
+        {/* Handwriting Mode Toggle */}
+        <div className="ocr-mode-toggle">
+          <Type size={14} />
+          <span style={{ opacity: isHandwritingMode ? 0.5 : 1 }}>PRINTED</span>
+          <div
+            className={`toggle-track ${isHandwritingMode ? 'active' : ''}`}
+            onClick={() => setIsHandwritingMode(!isHandwritingMode)}
+          >
+            <div className="toggle-thumb" />
+          </div>
+          <span style={{ opacity: isHandwritingMode ? 1 : 0.5 }}>HANDWRITTEN</span>
+          <PenTool size={14} />
+        </div>
       </div>
 
       <div style={scannerMainGrid}>
         {/* Left Side: Upload zone and presets */}
         <div>
-          <h3 style={{ marginBottom: '0.75rem' }}>Upload History Records</h3>
+          <h3 style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Image size={20} /> Upload Medical Records
+          </h3>
 
-          {/* Uploader Box — now clickable, triggers real Tesseract OCR */}
+          {/* Google Keep-style Drop Zone */}
           <div
-            style={uploaderBoxStyle}
+            className={`drop-zone ${isDragActive ? 'drop-active' : ''}`}
             onClick={() => fileInputRef.current?.click()}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
           >
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,.pdf"
               style={{ display: 'none' }}
               onChange={handleRealFileUpload}
             />
-            <Upload size={32} style={{ marginBottom: '0.5rem' }} />
-            <div style={{ fontWeight: '700' }}>Click to Upload Prior Records</div>
-            <div style={{ fontSize: '0.75rem', color: '#555', marginTop: '0.2rem' }}>Printed prescriptions, lab PDFs (as image)</div>
-            <div style={{ marginTop: '0.75rem', fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: '800', backgroundColor: '#EEE', padding: '0.2rem 0.5rem', border: '1px solid #1E1E1E' }}>
-              OR SELECT DEMO TEMPLATES BELOW
-            </div>
-          </div>
-
-          {/* Quick Demo Templates */}
-          <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <button
-              onClick={() => handlePresetSelect('prescription')}
-              className="neo-btn btn-white"
-              style={presetBtnStyle}
-              disabled={isScanning}
-            >
-              <FileText size={18} /> Load Dr. Verma Prescription (Handwritten) <ChevronRight size={16} />
-            </button>
-            <button
-              onClick={() => handlePresetSelect('lab_report')}
-              className="neo-btn btn-white"
-              style={presetBtnStyle}
-              disabled={isScanning}
-            >
-              <FileText size={18} /> Load Thyrocare Renal Lab Report <ChevronRight size={16} />
-            </button>
-            <button
-              onClick={() => handlePresetSelect('discharge')}
-              className="neo-btn btn-white"
-              style={presetBtnStyle}
-              disabled={isScanning}
-            >
-              <FileText size={18} /> Load Max Hospital Discharge Summary <ChevronRight size={16} />
-            </button>
+            {isDragActive ? (
+              <>
+                <Upload size={40} style={{ marginBottom: '0.5rem', color: '#F9A825' }} />
+                <div style={{ fontWeight: '800', fontSize: '1.05rem', color: '#F57F17' }}>DROP TO SCAN!</div>
+                <div style={{ fontSize: '0.75rem', color: '#F9A825', marginTop: '0.2rem' }}>Release to start {isHandwritingMode ? 'handwriting' : 'printed'} OCR</div>
+              </>
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.75rem' }}>
+                  <div style={uploadIconCircle}>
+                    <Upload size={24} />
+                  </div>
+                  <div style={uploadIconCircle} onClick={(e) => { e.stopPropagation(); cameraInputRef.current?.click(); }}>
+                    <Camera size={24} />
+                  </div>
+                </div>
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  style={{ display: 'none' }}
+                  onChange={handleRealFileUpload}
+                />
+                <div style={{ fontWeight: '800', fontSize: '1rem' }}>
+                  Drop, click, or 📸 capture
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#555', marginTop: '0.2rem' }}>
+                  {isHandwritingMode
+                    ? 'Handwritten mode active - routes images to local GLM-OCR vision analysis'
+                    : 'Printed mode active — runs OCR on image uploads and stores confidence'}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Right Side: Scan Status / Real-time Digitizer */}
+        {/* Right Side: Scan Status / Google Keep Preview */}
         <div className="neo-card" style={{ backgroundColor: '#F9FAFB', border: '2px solid #1E1E1E', padding: '1rem', boxShadow: 'none', minHeight: '350px' }}>
 
           {/* Active scanning state animation */}
           {isScanning && (
             <div style={scannerLoadingContainer}>
               <div style={scanningLaserBeam} />
-              <FileText size={48} className="animate-pulse-slow" style={{ color: '#C084FC', marginBottom: '1rem' }} />
-              <h4 style={{ fontFamily: 'var(--font-display)' }}>OCR DIGITIZING...</h4>
+              <div className="ocr-shimmer" style={{ width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid #1E1E1E', marginBottom: '1rem' }}>
+                {isHandwritingMode ? <PenTool size={32} style={{ color: '#1E1E1E' }} /> : <FileText size={32} style={{ color: '#1E1E1E' }} />}
+              </div>
+              <h4 style={{ fontFamily: 'var(--font-display)' }}>
+                {isHandwritingMode ? '✍️ HANDWRITING OCR...' : '📄 PRINTED OCR...'}
+              </h4>
               <p style={{ fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
-                Running segmenter and table parser on {scanningDocName}
+                Digitizing {scanningDocName}
                 {ocrProgress > 0 && ocrProgress < 100 ? ` (${ocrProgress}%)` : ''}
               </p>
+              {ocrProgress > 0 && (
+                <div style={progressBarContainer}>
+                  <div style={{ ...progressBarFill, width: `${ocrProgress}%` }} />
+                </div>
+              )}
             </div>
           )}
 
-          {/* Previewing structured output */}
+          {/* Previewing structured output (for presets with structured data) */}
           {!isScanning && previewDoc && (
             <div>
               <div className="flex-between" style={{ borderBottom: '2px solid #1E1E1E', paddingBottom: '0.5rem', marginBottom: '0.75rem' }}>
                 <span className="neo-badge badge-green" style={{ fontSize: '0.65rem' }}>OCR SUCCESSFUL</span>
                 <span style={{ fontWeight: '700', fontSize: '0.85rem', maxWidth: '65%', overflow: 'hidden', textOverflow: 'ellipsis' }}>{previewDoc.name}</span>
+              </div>
+              <div style={confidenceStripStyle}>
+                <strong>Source:</strong> {previewDoc.sourceKind || 'uploaded_file'} |
+                <strong> Printed OCR:</strong> {previewDoc.ocrConfidence ?? 'N/A'}% |
+                <strong> GLM-OCR:</strong> {previewDoc.handwrittenConfidence ?? 'N/A'}%
               </div>
 
               {/* Prescriptions View */}
@@ -389,7 +471,7 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
                 </div>
               )}
 
-              {/* Fallback: real-upload docs with no structuredData at all — just show raw text prominently */}
+              {/* Fallback for real-upload docs with no structuredData — show raw OCR text */}
               {previewDoc.structuredData &&
                 !previewDoc.structuredData.medications &&
                 !previewDoc.structuredData.metrics &&
@@ -416,15 +498,108 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
 
           {!isScanning && !previewDoc && (
             <div style={emptyScanContainer}>
-              <AlertCircle size={28} style={{ color: 'var(--color-gray)', marginBottom: '0.5rem' }} />
-              <h4>Pending Digitization</h4>
-              <p style={{ fontSize: '0.75rem', color: '#666', textAlign: 'center', maxWidth: '80%', marginTop: '0.2rem' }}>
-                Upload a real document or select a demo preset on the left to start digitization.
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: '#FFF9C4', border: '3px solid #1E1E1E', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.75rem' }}>
+                <PenTool size={28} style={{ color: '#1E1E1E' }} />
+              </div>
+              <h4>Google Keep-Style OCR</h4>
+              <p style={{ fontSize: '0.75rem', color: '#666', textAlign: 'center', maxWidth: '85%', marginTop: '0.3rem' }}>
+                Upload a handwritten or printed document, snap a photo, or drag & drop an image to extract text — just like Google Keep's "Grab image text" feature.
               </p>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                <span className="neo-badge badge-yellow" style={{ fontSize: '0.55rem' }}>✍️ HANDWRITING</span>
+                <span className="neo-badge" style={{ fontSize: '0.55rem' }}>📸 CAMERA</span>
+                <span className="neo-badge badge-green" style={{ fontSize: '0.55rem' }}>📋 DRAG & DROP</span>
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Google Keep Notes Grid — displays all scanned docs as note cards */}
+      {keepNotes.length > 0 && (
+        <div style={{ marginTop: '1.5rem', borderTop: '3px solid #1E1E1E', paddingTop: '1rem' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            📋 DIGITIZED NOTES ({keepNotes.length})
+          </h3>
+          <p style={{ fontSize: '0.7rem', color: '#666', marginBottom: '0.5rem' }}>
+            Extracted text displayed as Google Keep-style note cards. Pin, copy, or delete notes.
+          </p>
+
+          <div className="keep-notes-grid">
+            {sortedNotes.map((note) => (
+              <div key={note.doc.id} className={`keep-note ${note.colorClass}`}>
+                {/* Image thumbnail */}
+                {note.imagePreview && (
+                  <img
+                    src={note.imagePreview}
+                    alt={note.doc.name}
+                    className="keep-note-image"
+                  />
+                )}
+
+                {/* Header */}
+                <div className="keep-note-header">
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', maxWidth: '70%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {note.isPinned && <Pin size={12} fill="#1E1E1E" />}
+                    {note.doc.name}
+                  </span>
+                  <span className="neo-badge" style={{ fontSize: '0.5rem', padding: '0.05rem 0.25rem' }}>
+                    {note.doc.type === 'prescription' ? '💊 RX' : note.doc.type === 'lab_report' ? '🔬 LAB' : '🏥 DC'}
+                  </span>
+                </div>
+
+                {/* Body: Extracted text */}
+                <div className="keep-note-body">
+                  <div className="keep-note-text">{note.doc.rawText}</div>
+                  {note.doc.gemmaSummary && (
+                    <div style={gemmaSummaryNoteBox}>
+                      <div style={{ fontWeight: '800', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '3px', marginBottom: '0.2rem', color: '#B45309' }}>
+                        <Sparkles size={12} style={{ color: '#F59E0B' }} /> GLM CLINICAL CHECK
+                      </div>
+                      <div style={{ fontSize: '0.72rem', whiteSpace: 'pre-wrap', lineHeight: '1.4', color: '#1E1E1E' }}>
+                        {note.doc.gemmaSummary}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div style={confidenceMiniStyle}>
+                  Tesseract {note.doc.ocrConfidence ?? 'N/A'}% | GLM {note.doc.handwrittenConfidence ?? 'N/A'}%
+                </div>
+
+                {/* Footer with actions */}
+                <div className="keep-note-footer">
+                  <span>{note.doc.uploadedAt}</span>
+                  <div className="keep-note-actions" style={{ position: 'relative' }}>
+                    {copiedNoteId === note.doc.id && (
+                      <div className="copy-toast">COPIED!</div>
+                    )}
+                    <button 
+                      onClick={() => handleGemmaCheck(note.doc.id)} 
+                      title="Run Local GLM OCR/Clinical Double-Check"
+                      disabled={loadingGemmaNoteId === note.doc.id}
+                      style={{ color: note.doc.gemmaSummary ? '#D97706' : '#555' }}
+                    >
+                      <Sparkles size={14} className={loadingGemmaNoteId === note.doc.id ? 'animate-spin' : ''} />
+                    </button>
+                    <button onClick={() => handleTogglePin(note.doc.id)} title={note.isPinned ? 'Unpin' : 'Pin'}>
+                      <Pin size={14} fill={note.isPinned ? '#1E1E1E' : 'none'} />
+                    </button>
+                    <button onClick={() => handleCopyText(note.doc.id, note.doc.rawText)} title="Copy text">
+                      <Copy size={14} />
+                    </button>
+                    <button onClick={() => { setPreviewDoc(note.doc); }} title="View details">
+                      <Eye size={14} />
+                    </button>
+                    <button onClick={() => handleDeleteNote(note.doc.id)} title="Delete note">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Visual Health History Timeline Section */}
       {timeline.length > 0 && (
@@ -491,25 +666,18 @@ const scannerMainGrid: React.CSSProperties = {
   gap: '1.5rem',
 };
 
-const uploaderBoxStyle: React.CSSProperties = {
-  border: '3px dashed #1E1E1E',
-  borderRadius: '8px',
-  padding: '2.5rem 1rem',
+const uploadIconCircle: React.CSSProperties = {
+  width: '52px',
+  height: '52px',
+  borderRadius: '50%',
+  border: '3px solid #1E1E1E',
   display: 'flex',
-  flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  backgroundColor: '#FFF',
+  backgroundColor: '#FFF9C4',
   cursor: 'pointer',
-};
-
-const presetBtnStyle: React.CSSProperties = {
-  width: '100%',
-  justifyContent: 'space-between',
-  fontSize: '0.85rem',
-  padding: '0.6rem 1rem',
-  textAlign: 'left',
-  boxShadow: '3px 3px 0px #1E1E1E',
+  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+  boxShadow: '2px 2px 0px #1E1E1E',
 };
 
 const scannerLoadingContainer: React.CSSProperties = {
@@ -520,6 +688,7 @@ const scannerLoadingContainer: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   overflow: 'hidden',
+  minHeight: '300px',
 };
 
 const scanningLaserBeam: React.CSSProperties = {
@@ -528,9 +697,26 @@ const scanningLaserBeam: React.CSSProperties = {
   left: 0,
   width: '100%',
   height: '4px',
-  backgroundColor: '#4ADE80',
-  boxShadow: '0 0 10px #4ADE80, 0 0 20px #4ADE80',
+  backgroundColor: '#FBC02D',
+  boxShadow: '0 0 10px #FBC02D, 0 0 20px #FBC02D',
   animation: 'scanLine 2s linear infinite',
+};
+
+const progressBarContainer: React.CSSProperties = {
+  width: '60%',
+  height: '8px',
+  backgroundColor: '#E0E0E0',
+  borderRadius: '4px',
+  border: '1.5px solid #1E1E1E',
+  marginTop: '0.75rem',
+  overflow: 'hidden',
+};
+
+const progressBarFill: React.CSSProperties = {
+  height: '100%',
+  backgroundColor: '#FBC02D',
+  borderRadius: '3px',
+  transition: 'width 0.3s ease',
 };
 
 const emptyScanContainer: React.CSSProperties = {
@@ -539,6 +725,7 @@ const emptyScanContainer: React.CSSProperties = {
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
+  minHeight: '300px',
 };
 
 const parsedTableStyle: React.CSSProperties = {
@@ -569,6 +756,24 @@ const ocrHighlightFooter: React.CSSProperties = {
   borderRadius: '4px',
 };
 
+const confidenceStripStyle: React.CSSProperties = {
+  marginBottom: '0.75rem',
+  backgroundColor: '#EEF2FF',
+  border: '1.5px solid #1E1E1E',
+  borderRadius: '4px',
+  padding: '0.35rem 0.5rem',
+  fontSize: '0.68rem',
+};
+
+const confidenceMiniStyle: React.CSSProperties = {
+  marginTop: '0.4rem',
+  paddingTop: '0.3rem',
+  borderTop: '1px dashed rgba(30,30,30,0.35)',
+  fontSize: '0.62rem',
+  fontWeight: 800,
+  color: '#555',
+};
+
 const dischargeBoxStyle: React.CSSProperties = {
   border: '1.5px solid #1E1E1E',
   padding: '0.5rem',
@@ -581,7 +786,7 @@ const rawTextContainer: React.CSSProperties = {
   marginTop: '0.5rem',
   padding: '0.5rem',
   backgroundColor: '#1E1E1E',
-  color: '#4ADE80',
+  color: '#FBC02D',
   borderRadius: '4px',
   fontSize: '0.65rem',
   overflowX: 'auto',
@@ -619,7 +824,15 @@ const timelineBulletStyle: React.CSSProperties = {
   marginLeft: '-11px',
 };
 
-// Add scanner animation styles in component head or inject via css
+const gemmaSummaryNoteBox: React.CSSProperties = {
+  marginTop: '0.5rem',
+  padding: '0.4rem',
+  backgroundColor: 'rgba(255, 255, 255, 0.6)',
+  border: '1.5px dashed #D97706',
+  borderRadius: '4px',
+};
+
+// Add scanner animation styles
 if (typeof document !== 'undefined') {
   const styleTag = document.createElement('style');
   styleTag.innerHTML = `

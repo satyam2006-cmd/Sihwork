@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Shield, Cpu, X } from 'lucide-react';
+import { Settings, Cpu, X } from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   apiKey: string;
   setApiKey: (key: string) => void;
-  interviewMode: 'simulated' | 'gemini' | 'browser';
-  setInterviewMode: (mode: 'simulated' | 'gemini' | 'browser') => void;
+  interviewMode: 'simulated' | 'browser';
+  setInterviewMode: (mode: 'simulated' | 'browser') => void;
   patientName: string;
   setPatientName: (name: string) => void;
   patientAge: number;
@@ -65,7 +65,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       <div className="neo-card" style={modalContentStyle}>
         <div className="flex-between" style={{ marginBottom: '1.5rem', borderBottom: '3px solid #1E1E1E', paddingBottom: '0.75rem' }}>
           <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.5rem' }}>
-            <Settings size={28} /> HACKATHON SETTINGS
+            <Settings size={28} /> APP SETTINGS
           </h2>
           <button onClick={onClose} className="neo-btn btn-pink" style={{ padding: '0.4rem', borderRadius: '4px' }}>
             <X size={20} />
@@ -94,45 +94,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <span>2. Background Browser Automation (ChatGPT Guest)</span>
               <span className="neo-badge" style={{ fontSize: '0.55rem', padding: '0px 4px' }}>KEYLESS LIVE AI</span>
             </button>
-            <button
-              onClick={() => setLocalMode('gemini')}
-              className={`neo-btn ${localMode === 'gemini' ? 'btn-purple' : 'btn-white'}`}
-              style={{ padding: '0.6rem', textAlign: 'left', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}
-            >
-              <span>3. Live Gemini REST API (Standard Key)</span>
-              <span className="neo-badge" style={{ fontSize: '0.55rem', padding: '0px 4px' }}>FAST DIRECT API</span>
-            </button>
           </div>
           <p style={helpTextStyle}>
             {localMode === 'simulated' && "No internet/server needed. Runs instant Branching logic using static transcripts, safe for bad Wi-Fi."}
             {localMode === 'browser' && "Launches headed Chromium in background (Node port 3001). Types prompts on chatgpt.com & returns structured response."}
-            {localMode === 'gemini' && "Performs direct fetch requests online. Requires a developer Gemini API key."}
           </p>
         </div>
 
-        {/* API Key */}
-        {localMode === 'gemini' && (
-          <div style={formGroupStyle}>
-            <label style={labelStyle}>
-              <Shield size={18} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> GEMINI API KEY
-            </label>
-            <input
-              type="password"
-              className="neo-input"
-              value={localKey}
-              onChange={(e) => setLocalKey(e.target.value)}
-              placeholder="AIzaSy..."
-              style={{ marginTop: '0.5rem' }}
-            />
-            <p style={helpTextStyle}>
-              Get a free API key from Google AI Studio. Stored strictly in your browser's local storage.
-            </p>
-          </div>
-        )}
-
         {/* Patient Mock Details */}
         <h3 style={{ margin: '1.25rem 0 0.5rem 0', borderBottom: '2px solid #1E1E1E', paddingBottom: '0.25rem' }}>
-          PATIENT PROFILE FOR DEMO
+          PATIENT PROFILE
         </h3>
         
         <div style={formRowStyle}>

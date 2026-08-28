@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, Heart, Database, Share2, ArrowRight, CheckCircle, RefreshCw } from 'lucide-react';
-import { PatientRecord, ScannedDoc, TimelineEvent, TriagePriority } from '../types/medical';
-import { generateClinicalSummary, generateClinicalSummaryViaBrowser } from '../utils/ai';
+import { AppLanguageCode, PatientRecord, ScannedDoc, TimelineEvent, TriagePriority } from '../types/medical';
+import { generateClinicalSummaryLocalMedGemma } from '../utils/ai';
 
 interface SummarizeRouteSectionProps {
   apiKey: string;
-  interviewMode: 'simulated' | 'gemini' | 'browser';
+  interviewMode: 'simulated' | 'browser';
   patientName: string;
   patientAge: number;
   patientGender: string;
+  languageCode: AppLanguageCode;
+  otherLanguageName: string;
   chiefComplaint: string;
   hpi: string;
   redFlags: string[];
@@ -19,11 +21,11 @@ interface SummarizeRouteSectionProps {
 }
 
 export const SummarizeRouteSection: React.FC<SummarizeRouteSectionProps> = ({
-  apiKey,
-  interviewMode,
   patientName,
   patientAge,
   patientGender,
+  languageCode,
+  otherLanguageName,
   chiefComplaint,
   hpi,
   redFlags,
@@ -52,21 +54,18 @@ export const SummarizeRouteSection: React.FC<SummarizeRouteSectionProps> = ({
   const generateSummaryContent = async () => {
     setIsGenerating(true);
     try {
-      const generated = interviewMode === 'browser'
-        ? await generateClinicalSummaryViaBrowser({
-            chiefComplaint,
-            hpi,
-            redFlags,
-            triageLevel,
-            scannedDocs
-          })
-        : await generateClinicalSummary({
-            chiefComplaint,
-            hpi,
-            redFlags,
-            triageLevel,
-            scannedDocs
-          }, apiKey);
+      const generated = await generateClinicalSummaryLocalMedGemma({
+        name: patientName,
+        age: patientAge,
+        gender: patientGender,
+        languageCode,
+        otherLanguageName,
+        chiefComplaint,
+        hpi,
+        redFlags,
+        triageLevel,
+        scannedDocs
+      });
       setSummary(generated);
     } catch (e) {
       console.error(e);
@@ -151,7 +150,7 @@ export const SummarizeRouteSection: React.FC<SummarizeRouteSectionProps> = ({
         {/* Left Side: Summary transcription */}
         <div style={{ flex: 1.3 }}>
           <div className="flex-between" style={{ marginBottom: '0.5rem' }}>
-            <h3 style={{ fontSize: '1.1rem' }}>Structured History Summary</h3>
+            <h3 style={{ fontSize: '1.1rem' }}>MedGemma Doctor One-Shot Summary</h3>
             <button 
               onClick={generateSummaryContent} 
               className="neo-btn btn-white" 
@@ -165,7 +164,7 @@ export const SummarizeRouteSection: React.FC<SummarizeRouteSectionProps> = ({
           <div className="neo-card" style={transcriptionPaper}>
             {isGenerating ? (
               <div style={spinnerStyle}>
-                <div className="animate-pulse-slow" style={{ fontWeight: '800' }}>COMPILING MEDICAL RECORD SYNTHESIS...</div>
+                <div className="animate-pulse-slow" style={{ fontWeight: '800' }}>MEDGEMMA COMPILING DOCTOR SUMMARY...</div>
               </div>
             ) : (
               <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'var(--font-body)', fontSize: '0.85rem', lineHeight: '1.5' }}>

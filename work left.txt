@@ -1,0 +1,45 @@
+- [x] Stateful interviewer setup: send the master prompt once per browser session, then send short follow-up prompts only.
+- [x] Proper interview flow: symptoms, HPI, red flags, past diseases, allergies, chronic disease history, medicines, and final upload request.
+- [x] Improve microphone UX so patient speech can be collected across longer answers before submission.
+- [x] OCR routing: printed documents use OCR, handwritten documents go to local vision/Gemma-style analysis.
+- [x] Add confidence fields for printed OCR and handwritten analysis.
+- [x] Keep uploaded images/PDFs attached and visible on the final doctor dashboard.
+- [x] Run build/typecheck and record any remaining work.
+
+Remaining notes:
+- `npm run build` cannot use the system npm on this PC because the global npm CLI path is broken, so verification used local binaries directly.
+- `.\node_modules\.bin\tsc.cmd --noEmit` passed.
+- `.\node_modules\.bin\vite.cmd build` passed when run with permission outside the sandbox.
+
+Mic/TTS fix:
+- [x] Stop repeated interim transcript duplication.
+- [x] Add proper mic controls: start, stop, clear, send, replay agent voice.
+- [x] Select a better interviewer TTS voice by default and allow manual voice selection.
+- [x] Re-run typecheck/build.
+
+Local Ollama routing:
+- [x] Keep printed documents on Tesseract OCR.
+- [x] Route handwritten images to local `glm-ocr:latest`.
+- [x] Generate final doctor summary with local `gemma4:e2b` from interview + OCR.
+- [x] Push local Gemma summary and all attachments to doctor dashboard.
+- [x] Re-run typecheck/build.
+
+Language-first patient flow:
+- [x] Add first-page language selection before patient session.
+- [x] Default TTS voice preference to `Google हिन्दी (hi-IN)`.
+- [x] Rewire patient interview labels, greeting, mic language, and TTS language from selected language.
+- [x] Pass selected language into ChatGPT browser session setup and follow-up prompts.
+- [x] Pass selected language into local Gemma final summary context.
+- [x] Re-run typecheck/build.
+
+Language list update:
+- [x] Built-in language choices are Gujarati, Marathi, Hindi, and English.
+- [x] Added Other language entry box.
+- [x] Added Google Translate page widget for Other language UI translation.
+- [x] Pass typed Other language to ChatGPT and local Gemma.
+- [x] Re-run typecheck/build.
+
+gTTS speech output:
+- [x] Use Google TTS audio for agent speech before browser speech synthesis fallback.
+- [x] Map Gujarati, Marathi, Hindi, English, and common Other languages to Google TTS language codes.
+- [x] Re-run typecheck/build.

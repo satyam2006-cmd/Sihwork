@@ -1,4 +1,23 @@
 export type TriagePriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+export type AppLanguageCode = 'gu-IN' | 'mr-IN' | 'hi-IN' | 'en-IN' | 'other';
+
+export interface AppLanguage {
+  code: AppLanguageCode;
+  label: string;
+  nativeLabel: string;
+  chatgptName: string;
+}
+
+export type InterviewStage =
+  | 'chief_complaint'
+  | 'hpi_details'
+  | 'red_flags'
+  | 'past_history'
+  | 'allergies'
+  | 'chronic_conditions'
+  | 'medications'
+  | 'uploads'
+  | 'complete';
 
 export interface SpeechTurn {
   id: string;
@@ -8,6 +27,7 @@ export interface SpeechTurn {
 }
 
 export type DocumentType = 'prescription' | 'lab_report' | 'discharge_summary';
+export type DocumentSourceKind = 'printed_ocr' | 'handwritten_gemma' | 'uploaded_file';
 
 export interface ScannedDoc {
   id: string;
@@ -15,6 +35,13 @@ export interface ScannedDoc {
   type: DocumentType;
   uploadedAt: string;
   rawText: string;
+  imagePreview?: string; // data URL of uploaded document image/PDF preview
+  filePreview?: string; // object URL for PDFs or other files that should open in dashboard
+  mimeType?: string;
+  sourceKind?: DocumentSourceKind;
+  ocrConfidence?: number;
+  handwrittenConfidence?: number;
+  gemmaSummary?: string; // legacy field for local GLM-generated verification and document summary
   structuredData: {
     medications?: Array<{ name: string; dosage: string; frequency: string; duration: string }>;
     metrics?: Array<{ name: string; value: string; range: string; status: 'normal' | 'high' | 'low' }>;

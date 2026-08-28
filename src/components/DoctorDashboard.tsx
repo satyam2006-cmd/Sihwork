@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Activity, ShieldCheck, FileText, Calendar, CheckSquare, Clock, AlertTriangle } from 'lucide-react';
+import { Activity, ShieldCheck, FileText, Calendar, CheckSquare, Clock, AlertTriangle, Sparkles, Eye, X } from 'lucide-react';
 import { PatientRecord, TriagePriority } from '../types/medical';
 
 interface DoctorDashboardProps {
@@ -14,6 +14,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(
     patients[0]?.id || null
   );
+  const [dashboardPreviewImg, setDashboardPreviewImg] = useState<string | null>(null);
 
   // If no selected patient but patients exist, auto-select the first one
   const activePatient = patients.find(p => p.id === selectedPatientId) || patients[0];
@@ -200,13 +201,68 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
 
                     {/* Parsed Scanned Documents Preview */}
                     <h4 style={{ fontSize: '0.8rem', fontWeight: '800', marginTop: '0.25rem' }}>Scanned Documents Extracted:</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '350px', overflowY: 'auto' }}>
                       {activePatient.scannedDocs.map((doc) => (
-                        <div key={doc.id} style={docChipStyle}>
-                          <span style={{ fontSize: '0.7rem', fontWeight: '800' }}>📄 {doc.name}</span>
-                          <span className="neo-badge badge-yellow" style={{ fontSize: '0.55rem', padding: '0.05rem 0.2rem' }}>
-                            {doc.type.toUpperCase()}
-                          </span>
+                        <div key={doc.id} className="neo-card" style={{ padding: '0.6rem', margin: 0, boxShadow: '2px 2px 0px #1E1E1E' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: '800', maxWidth: '70%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📄 {doc.name}</span>
+                            <span className="neo-badge badge-yellow" style={{ fontSize: '0.5rem', padding: '0.05rem 0.25rem' }}>
+                              {doc.type.toUpperCase()}
+                            </span>
+                          </div>
+
+                          {doc.imagePreview ? (
+                            <div 
+                              style={{ border: '2px solid #1E1E1E', borderRadius: '4px', overflow: 'hidden', marginTop: '0.25rem', cursor: 'pointer', position: 'relative' }} 
+                              onClick={() => setDashboardPreviewImg(doc.imagePreview || null)}
+                              title="Click to double-check original document image"
+                            >
+                              <img src={doc.imagePreview} alt={doc.name} style={{ width: '100%', maxHeight: '110px', objectFit: 'cover' }} />
+                              <div style={{ backgroundColor: '#1E1E1E', color: '#FFF', fontSize: '0.6rem', textAlign: 'center', padding: '0.15rem 0', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                                <Eye size={10} /> View Original Document Image
+                              </div>
+                            </div>
+                          ) : doc.filePreview ? (
+                            <a
+                              href={doc.filePreview}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={attachedFileLinkStyle}
+                              title="Open attached PDF/report"
+                            >
+                              <Eye size={12} /> Open attached file
+                            </a>
+                          ) : (
+                            <div style={{ fontSize: '0.65rem', color: '#777', fontStyle: 'italic', marginTop: '0.25rem', padding: '0.25rem', border: '1.5px dashed #CCC', borderRadius: '4px', textAlign: 'center' }}>
+                              No original image attached.
+                            </div>
+                          )}
+
+                          <div style={confidenceDashStyle}>
+                            <div><strong>Source:</strong> {doc.sourceKind || 'uploaded_file'}</div>
+                            <div><strong>Printed OCR:</strong> {doc.ocrConfidence ?? 'N/A'}%</div>
+                            <div><strong>GLM-OCR:</strong> {doc.handwrittenConfidence ?? 'N/A'}%</div>
+                          </div>
+
+                          {doc.gemmaSummary && (
+                            <div style={gemmaSummaryDashBox}>
+                              <div style={{ fontWeight: '800', fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: '3px', marginBottom: '0.2rem', color: '#B45309' }}>
+                                <Sparkles size={11} style={{ color: '#F59E0B' }} /> GLM CLINICAL CHECK
+                              </div>
+                              <div style={{ fontSize: '0.7rem', whiteSpace: 'pre-wrap', lineHeight: '1.35', color: '#1E1E1E' }}>
+                                {doc.gemmaSummary}
+                              </div>
+                            </div>
+                          )}
+
+                          <details style={{ marginTop: '0.35rem' }}>
+                            <summary style={{ cursor: 'pointer', fontSize: '0.65rem', fontWeight: '800', textTransform: 'uppercase', color: '#555' }}>
+                              View Raw OCR Text
+                            </summary>
+                            <pre style={{ backgroundColor: '#1E1E1E', color: '#4ADE80', padding: '0.4rem', borderRadius: '4px', fontSize: '0.62rem', maxHeight: '100px', overflowY: 'auto', whiteSpace: 'pre-wrap', marginTop: '0.25rem', fontFamily: 'monospace' }}>
+                              {doc.rawText}
+                            </pre>
+                          </details>
                         </div>
                       ))}
                     </div>
@@ -218,6 +274,23 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
             )}
           </div>
 
+        </div>
+      )}
+
+      {/* Full Screen Image Preview Modal */}
+      {dashboardPreviewImg && (
+        <div style={modalOverlayStyle} onClick={() => setDashboardPreviewImg(null)}>
+          <div className="neo-card" style={{ maxWidth: '90%', maxHeight: '90%', backgroundColor: '#FFF', padding: '1rem', boxShadow: '8px 8px 0px #1E1E1E', display: 'flex', flexDirection: 'column', alignItems: 'center', margin: 0 }} onClick={e => e.stopPropagation()}>
+            <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #1E1E1E', paddingBottom: '0.5rem', marginBottom: '0.5rem' }}>
+              <span style={{ fontWeight: '800', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Eye size={16} /> ORIGINAL ATTACHED HEALTH RECORD IMAGE
+              </span>
+              <button className="neo-btn btn-pink" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', boxShadow: '2px 2px 0px #1E1E1E' }} onClick={() => setDashboardPreviewImg(null)}>
+                <X size={14} /> Close
+              </button>
+            </div>
+            <img src={dashboardPreviewImg} alt="Original health record" style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', border: '3px solid #1E1E1E' }} />
+          </div>
         </div>
       )}
     </div>
@@ -296,12 +369,50 @@ const dotStyle: React.CSSProperties = {
   top: '3px',
 };
 
-const docChipStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
+const gemmaSummaryDashBox: React.CSSProperties = {
+  marginTop: '0.5rem',
   padding: '0.4rem',
-  border: '1.5px solid #1E1E1E',
-  backgroundColor: '#F3F4F6',
+  backgroundColor: '#FFFBEB',
+  border: '1.5px dashed #D97706',
   borderRadius: '4px',
+};
+
+const confidenceDashStyle: React.CSSProperties = {
+  marginTop: '0.4rem',
+  padding: '0.35rem',
+  backgroundColor: '#EEF2FF',
+  border: '1.5px solid #1E1E1E',
+  borderRadius: '4px',
+  fontSize: '0.62rem',
+  lineHeight: 1.45,
+};
+
+const attachedFileLinkStyle: React.CSSProperties = {
+  marginTop: '0.25rem',
+  border: '2px solid #1E1E1E',
+  borderRadius: '4px',
+  padding: '0.45rem',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '0.25rem',
+  color: '#1E1E1E',
+  backgroundColor: '#FFF',
+  fontSize: '0.68rem',
+  fontWeight: 800,
+  textDecoration: 'none',
+};
+
+const modalOverlayStyle: React.CSSProperties = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  width: '100%',
+  height: '100%',
+  backgroundColor: 'rgba(0,0,0,0.6)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 2000,
+  backdropFilter: 'blur(4px)',
 };

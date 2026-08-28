@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Send, Volume2, VolumeX, AlertTriangle, CheckCircle, RefreshCw, Sparkles } from 'lucide-react';
-import { SpeechTurn, TriagePriority } from '../types/medical';
-import { callGeminiAPI, getMockResponse, callBrowserAutomationAPI } from '../utils/ai';
+import { Mic, MicOff, Send, Volume2, VolumeX, AlertTriangle, CheckCircle, RefreshCw, Sparkles, Trash2, PlayCircle } from 'lucide-react';
+import { AppLanguageCode, SpeechTurn, TriagePriority } from '../types/medical';
+import { getMockResponse, callBrowserAutomationAPI, startBrowserInterviewSession } from '../utils/ai';
+import { getGoogleTtsLanguage, getInitialGreeting, getPatientUiCopy, getSpeechRecognitionLanguage } from '../utils/language';
 
 interface ConverseSectionProps {
-  apiKey: string;
-  interviewMode: 'simulated' | 'gemini' | 'browser';
+  interviewMode: 'simulated' | 'browser';
   patientName: string;
   patientAge: number;
   patientGender: string;
+  languageCode: AppLanguageCode;
+  otherLanguageName: string;
   onInterviewComplete: (data: {
     chiefComplaint: string;
     hpi: string;
@@ -19,21 +21,26 @@ interface ConverseSectionProps {
 }
 
 export const ConverseSection: React.FC<ConverseSectionProps> = ({
-  apiKey,
   interviewMode,
   patientName,
   patientAge,
   patientGender,
+  languageCode,
+  otherLanguageName,
   onInterviewComplete,
 }) => {
+  const copy = getPatientUiCopy(languageCode);
+  const initialGreeting = getInitialGreeting(languageCode);
   const [turns, setTurns] = useState<SpeechTurn[]>([]);
-  const [currentAIQuestion, setCurrentAIQuestion] = useState(
-    "Hello! I am your AI clinical assistant. What primary symptoms or medical concerns bring you to the clinic today?"
-  );
+  const [currentAIQuestion, setCurrentAIQuestion] = useState(initialGreeting);
   const [patientInput, setPatientInput] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [listeningStatus, setListeningStatus] = useState('Mic idle');
+  const [aiBackendStatus, setAiBackendStatus] = useState('Simulator ready');
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceName, setSelectedVoiceName] = useState('');
 
   // Clinical states extracted
   const [chiefComplaint, setChiefComplaint] = useState('');
@@ -45,34 +52,71 @@ export const ConverseSection: React.FC<ConverseSectionProps> = ({
   const recognitionRef = useRef<any>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const speechBaseRef = useRef('');
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const speechRequestRef = useRef(0);
 
   // Initialize Speech Synthesis & Speech Recognition
   useEffect(() => {
     synthRef.current = window.speechSynthesis;
+
+    const refreshVoices = () => {
+      if (!synthRef.current) return;
+      const voices = synthRef.current.getVoices();
+      setAvailableVoices(voices);
+      if (!selectedVoiceName && voices.length > 0) {
+        const preferredVoice = chooseBestVoice(voices, languageCode);
+        if (preferredVoice) setSelectedVoiceName(preferredVoice.name);
+      }
+    };
+
+    refreshVoices();
+    if (synthRef.current) {
+      synthRef.current.onvoiceschanged = refreshVoices;
+    }
     
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
       const rec = new SpeechRecognition();
-      rec.continuous = false;
-      rec.interimResults = false;
-      rec.lang = 'en-IN'; // Indian-English or standard en-US
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = getSpeechRecognitionLanguage(languageCode);
 
       rec.onstart = () => {
         setIsRecording(true);
+        setListeningStatus('Listening...');
       };
 
       rec.onresult = (event: any) => {
-        const text = event.results[0][0].transcript;
-        setPatientInput(text);
+        const finalPhrases: string[] = [];
+        const interimPhrases: string[] = [];
+        for (let i = 0; i < event.results.length; i += 1) {
+          const phrase = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalPhrases.push(phrase);
+          } else {
+            interimPhrases.push(phrase);
+          }
+        }
+        const transcript = [
+          speechBaseRef.current,
+          finalPhrases.join(' '),
+          interimPhrases.join(' ')
+        ].join(' ');
+        setPatientInput(cleanTranscript(transcript));
+        setListeningStatus(interimPhrases.length > 0 ? 'Listening to live speech...' : 'Captured speech. Keep talking or stop.');
       };
 
       rec.onerror = (e: any) => {
         console.error('Speech recognition error:', e);
         setIsRecording(false);
+        setListeningStatus(`Mic error: ${e.error || 'unknown'}`);
       };
 
       rec.onend = () => {
         setIsRecording(false);
+        setPatientInput(prev => cleanTranscript(prev));
+        setListeningStatus('Mic stopped. Review the text, then send.');
       };
 
       recognitionRef.current = rec;
@@ -83,17 +127,29 @@ export const ConverseSection: React.FC<ConverseSectionProps> = ({
       {
         id: 'greet',
         sender: 'ai',
-        text: "Hello! I am your AI clinical assistant. What primary symptoms or medical concerns bring you to the clinic today?",
+        text: initialGreeting,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
 
-    // Speak initial greeting
-    speakText("Hello! I am your AI clinical assistant. What primary symptoms or medical concerns bring you to the clinic today?");
+    if (interviewMode === 'browser') {
+      startBrowserInterviewSession({ name: patientName, age: patientAge, gender: patientGender, languageCode, otherLanguageName }).then(ok => {
+        setAiBackendStatus(ok ? 'ChatGPT browser session ready' : 'ChatGPT backend offline; using local Qwen/Ollama fallback');
+      });
+    } else {
+      setAiBackendStatus('Simulator ready');
+    }
+
+    speakText(initialGreeting);
 
     return () => {
       if (synthRef.current) {
         synthRef.current.cancel();
+        synthRef.current.onvoiceschanged = null;
+      }
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
       }
     };
   }, []);
@@ -103,24 +159,44 @@ export const ConverseSection: React.FC<ConverseSectionProps> = ({
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [turns]);
 
-  const speakText = (text: string) => {
-    if (isMuted || !synthRef.current) return;
+  const speakText = async (text: string) => {
+    if (isMuted) return;
+    const requestId = speechRequestRef.current + 1;
+    speechRequestRef.current = requestId;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (await speakWithGoogleTts(text, languageCode, otherLanguageName, audioRef, speechRequestRef, requestId)) return;
+    if (!synthRef.current) return;
+    if (speechRequestRef.current !== requestId) return;
     synthRef.current.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    // Find an English voice
     const voices = synthRef.current.getVoices();
-    const englishVoice = voices.find(v => v.lang.includes('en-IN')) || voices.find(v => v.lang.includes('en-US')) || voices[0];
-    if (englishVoice) {
-      utterance.voice = englishVoice;
+    const selectedVoice = voices.find(v => v.name === selectedVoiceName) || chooseBestVoice(voices, languageCode);
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+      utterance.lang = selectedVoice.lang;
     }
-    utterance.rate = 1.0;
+    utterance.rate = 0.92;
+    utterance.pitch = 1.02;
+    utterance.volume = 1;
     synthRef.current.speak(utterance);
+  };
+
+  const replayAgentVoice = () => {
+    speakText(currentAIQuestion);
   };
 
   const toggleMute = () => {
     setIsMuted(!isMuted);
     if (!isMuted && synthRef.current) {
+      speechRequestRef.current += 1;
       synthRef.current.cancel();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
     } else {
       speakText(currentAIQuestion);
     }
@@ -130,9 +206,23 @@ export const ConverseSection: React.FC<ConverseSectionProps> = ({
     if (recognitionRef.current) {
       try {
         if (synthRef.current) synthRef.current.cancel();
+        speechRequestRef.current += 1;
+        if (audioRef.current) audioRef.current.pause();
+        speechBaseRef.current = patientInput.trim();
+        setListeningStatus('Starting mic...');
         recognitionRef.current.start();
       } catch (e) {
         recognitionRef.current.stop();
+        setListeningStatus('Restarting mic...');
+        window.setTimeout(() => {
+          try {
+            speechBaseRef.current = patientInput.trim();
+            recognitionRef.current?.start();
+          } catch (err) {
+            console.error('Mic restart failed:', err);
+            setListeningStatus('Mic could not restart. Please type instead.');
+          }
+        }, 250);
       }
     } else {
       alert('Speech Recognition API not supported in this browser. Please type your response.');
@@ -142,7 +232,17 @@ export const ConverseSection: React.FC<ConverseSectionProps> = ({
   const stopListening = () => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
+      setListeningStatus('Stopping mic...');
     }
+  };
+
+  const clearPatientInput = () => {
+    if (recognitionRef.current && isRecording) {
+      recognitionRef.current.stop();
+    }
+    speechBaseRef.current = '';
+    setPatientInput('');
+    setListeningStatus('Cleared. Ready for a fresh answer.');
   };
 
   const handleSubmitPatientResponse = async () => {
@@ -159,16 +259,19 @@ export const ConverseSection: React.FC<ConverseSectionProps> = ({
     const updatedTurns = [...turns, newPatientTurn];
     setTurns(updatedTurns);
     setPatientInput('');
+    speechBaseRef.current = '';
     setIsLoading(true);
 
     try {
       let aiResult;
       if (interviewMode === 'simulated') {
-        aiResult = getMockResponse(updatedTurns);
-      } else if (interviewMode === 'browser') {
-        aiResult = await callBrowserAutomationAPI(updatedTurns);
+        aiResult = getMockResponse(updatedTurns, languageCode);
       } else {
-        aiResult = await callGeminiAPI(updatedTurns, apiKey);
+        setAiBackendStatus('Asking AI...');
+        aiResult = await callBrowserAutomationAPI(updatedTurns, languageCode, otherLanguageName);
+      }
+      if (interviewMode === 'browser') {
+        setAiBackendStatus('AI response received');
       }
 
       // Update states
@@ -206,22 +309,33 @@ export const ConverseSection: React.FC<ConverseSectionProps> = ({
       {
         id: 'greet',
         sender: 'ai',
-        text: "Hello! I am your AI clinical assistant. What primary symptoms or medical concerns bring you to the clinic today?",
+        text: initialGreeting,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
-    setCurrentAIQuestion("Hello! I am your AI clinical assistant. What primary symptoms or medical concerns bring you to the clinic today?");
+    setCurrentAIQuestion(initialGreeting);
     setChiefComplaint('');
     setHpi('');
     setRedFlags([]);
     setTriageLevel('LOW');
     setIsInterviewFinished(false);
     setPatientInput('');
-    speakText("Hello! I am your AI clinical assistant. What primary symptoms or medical concerns bring you to the clinic today?");
+    speechBaseRef.current = '';
+    setListeningStatus('Mic idle');
+    if (interviewMode === 'browser') {
+      startBrowserInterviewSession({ name: patientName, age: patientAge, gender: patientGender, languageCode, otherLanguageName }).then(ok => {
+        setAiBackendStatus(ok ? 'ChatGPT browser session ready' : 'ChatGPT backend offline; using local Qwen/Ollama fallback');
+      });
+    } else {
+      setAiBackendStatus('Simulator ready');
+    }
+    speakText(initialGreeting);
   };
 
   const handleFinishInterview = () => {
+    speechRequestRef.current += 1;
     if (synthRef.current) synthRef.current.cancel();
+    if (audioRef.current) audioRef.current.pause();
     onInterviewComplete({
       chiefComplaint: chiefComplaint || "General checkup",
       hpi: hpi || "Interview closed.",
@@ -247,9 +361,29 @@ export const ConverseSection: React.FC<ConverseSectionProps> = ({
       <div className="flex-between" style={{ marginBottom: '1rem', borderBottom: '3px solid #1E1E1E', paddingBottom: '0.75rem' }}>
         <div>
           <span className="neo-badge badge-yellow" style={{ marginRight: '0.5rem' }}>STEP 2</span>
-          <span style={{ fontSize: '1.25rem', fontWeight: '800', fontFamily: 'var(--font-display)' }}>ADAPTIVE CLINICAL INTERVIEW</span>
+          <span style={{ fontSize: '1.25rem', fontWeight: '800', fontFamily: 'var(--font-display)' }}>{copy.interviewTitle}</span>
         </div>
         <div className="flex-gap">
+          <select
+            className="neo-input"
+            value={selectedVoiceName}
+            onChange={(e) => setSelectedVoiceName(e.target.value)}
+            style={{ height: '38px', minWidth: '190px', fontSize: '0.75rem', padding: '0.35rem' }}
+            title="Interviewer voice"
+          >
+            {availableVoices.length === 0 ? (
+              <option value="">Default voice</option>
+            ) : (
+              availableVoices.map((voice) => (
+                <option key={`${voice.name}-${voice.lang}`} value={voice.name}>
+                  {voice.name} ({voice.lang})
+                </option>
+              ))
+            )}
+          </select>
+          <button onClick={replayAgentVoice} className="neo-btn btn-white" style={{ padding: '0.5rem', boxShadow: '2px 2px 0px #1E1E1E' }} title="Replay interviewer voice">
+            <PlayCircle size={18} />
+          </button>
           <button onClick={toggleMute} className="neo-btn btn-white" style={{ padding: '0.5rem', boxShadow: '2px 2px 0px #1E1E1E' }}>
             {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
           </button>
@@ -261,8 +395,9 @@ export const ConverseSection: React.FC<ConverseSectionProps> = ({
 
       {/* Patient Profile Card (Subtle Neobrutalism) */}
       <div style={patientProfileStyle}>
-        <div style={{ fontWeight: '800' }}>PATIENT PROFILE DIRECTIVE:</div>
+        <div style={{ fontWeight: '800' }}>{copy.profileDirective}:</div>
         <div><strong>Name:</strong> {patientName} | <strong>Age:</strong> {patientAge} | <strong>Gender:</strong> {patientGender}</div>
+        <div><strong>{copy.aiBackend}:</strong> {aiBackendStatus}</div>
       </div>
 
       {/* Flashing Red Flag Banner if urgent */}
@@ -292,7 +427,7 @@ export const ConverseSection: React.FC<ConverseSectionProps> = ({
               }}
             >
               <div style={{ fontSize: '0.75rem', fontWeight: '800', marginBottom: '0.25rem', color: '#1E1E1E' }}>
-                {turn.sender === 'ai' ? '🤖 CLINICAL AI' : `👤 ${patientName.toUpperCase()}`}
+                {turn.sender === 'ai' ? copy.clinicalAi : patientName.toUpperCase()}
               </div>
               <div style={{ fontWeight: '500', fontSize: '0.95rem', lineHeight: '1.4' }}>{turn.text}</div>
               <div style={{ fontSize: '0.65rem', textAlign: 'right', marginTop: '0.25rem', opacity: 0.7 }}>
@@ -304,7 +439,7 @@ export const ConverseSection: React.FC<ConverseSectionProps> = ({
         {isLoading && (
           <div style={aiBubbleRowStyle}>
             <div className="neo-card animate-pulse-slow" style={{ ...bubbleStyle, backgroundColor: '#FFFFFF', boxShadow: '2px 2px 0px #1E1E1E' }}>
-              <div style={{ fontSize: '0.75rem', fontWeight: '800' }}>AI ANALYZING CLINICAL CLUES...</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: '800' }}>{copy.analyzing}</div>
             </div>
           </div>
         )}
@@ -322,7 +457,7 @@ export const ConverseSection: React.FC<ConverseSectionProps> = ({
               <div style={{ ...waveBar, animationDelay: '0.3s' }} />
               <div style={{ ...waveBar, animationDelay: '0.45s' }} />
               <div style={{ ...waveBar, animationDelay: '0.6s' }} />
-              <span style={{ fontSize: '0.8rem', fontWeight: '700', marginLeft: '0.5rem' }}>AI LISTENING... SPEAK NOW</span>
+              <span style={{ fontSize: '0.8rem', fontWeight: '700', marginLeft: '0.5rem' }}>{listeningStatus.toUpperCase()}</span>
             </div>
           )}
 
@@ -340,13 +475,25 @@ export const ConverseSection: React.FC<ConverseSectionProps> = ({
               type="text"
               className="neo-input"
               value={patientInput}
-              onChange={(e) => setPatientInput(e.target.value)}
-              placeholder="Speak using mic, or type details here (Adaptive Voice + Touch)..."
+              onChange={(e) => {
+                setPatientInput(e.target.value);
+                if (!isRecording) speechBaseRef.current = e.target.value.trim();
+              }}
+              placeholder={copy.inputPlaceholder}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSubmitPatientResponse();
               }}
               style={{ flex: 1, height: '48px' }}
             />
+            <button
+              onClick={clearPatientInput}
+              className="neo-btn btn-white"
+              style={{ flexShrink: 0, height: '48px', width: '48px', padding: 0 }}
+              disabled={!patientInput.trim() && !isRecording}
+              title="Clear captured speech"
+            >
+              <Trash2 size={18} />
+            </button>
             <button
               onClick={handleSubmitPatientResponse}
               className="neo-btn btn-yellow"
@@ -357,25 +504,25 @@ export const ConverseSection: React.FC<ConverseSectionProps> = ({
             </button>
           </div>
           <p style={{ fontSize: '0.75rem', color: '#555', marginTop: '0.5rem' }}>
-            ℹ️ Press <strong>Space</strong> or Click the microphone to talk. You can edit the transcript text by typing in the box before sending.
+            {listeningStatus}. {copy.micHelp}
           </p>
         </div>
       ) : (
         <div className="neo-alert alert-success" style={{ marginTop: '1.5rem', border: '3px solid #1E1E1E', flexDirection: 'column', alignItems: 'stretch' }}>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <CheckCircle size={22} />
-            <span style={{ fontWeight: '800', fontSize: '1.1rem' }}>INTERVIEW COMPLETED SUCCESSFULLY!</span>
+            <span style={{ fontWeight: '800', fontSize: '1.1rem' }}>{copy.finished}</span>
           </div>
           
           <div style={{ margin: '1rem 0', fontSize: '0.9rem', border: '2px solid #1E1E1E', padding: '0.75rem', backgroundColor: '#FFF', borderRadius: '4px' }}>
             <div style={{ marginBottom: '0.4rem' }}>
-              <strong>Triage Category:</strong> <span className={`neo-badge ${getTriageColorClass(triageLevel)}`}>{triageLevel} Priority</span>
+              <strong>{copy.triageCategory}:</strong> <span className={`neo-badge ${getTriageColorClass(triageLevel)}`}>{triageLevel} Priority</span>
             </div>
             <div style={{ marginBottom: '0.4rem' }}>
-              <strong>Chief Complaint:</strong> {chiefComplaint}
+              <strong>{copy.chiefComplaint}:</strong> {chiefComplaint}
             </div>
             <div>
-              <strong>Structured HPI Snippet:</strong>
+              <strong>{copy.hpiSnippet}:</strong>
               <div style={{ fontSize: '0.8rem', fontStyle: 'italic', marginTop: '0.2rem', color: '#333', whiteSpace: 'pre-wrap' }}>
                 {hpi}
               </div>
@@ -383,13 +530,87 @@ export const ConverseSection: React.FC<ConverseSectionProps> = ({
           </div>
 
           <button onClick={handleFinishInterview} className="neo-btn btn-yellow" style={{ width: '100%', padding: '0.85rem' }}>
-            Proceed to Step 3: Scan Medical Records <Sparkles size={18} />
+            {copy.proceedScan} <Sparkles size={18} />
           </button>
         </div>
       )}
     </div>
   );
 };
+
+function cleanTranscript(text: string): string {
+  return text.replace(/\s+/g, ' ').replace(/\s+([,.!?])/g, '$1').trim();
+}
+
+async function speakWithGoogleTts(
+  text: string,
+  languageCode: AppLanguageCode,
+  otherLanguageName: string,
+  audioRef: React.MutableRefObject<HTMLAudioElement | null>
+  ,
+  speechRequestRef: React.MutableRefObject<number>,
+  requestId: number
+): Promise<boolean> {
+  const chunks = splitForGoogleTts(text);
+  if (chunks.length === 0) return false;
+  const language = getGoogleTtsLanguage(languageCode, otherLanguageName);
+
+  try {
+    for (const chunk of chunks) {
+      if (speechRequestRef.current !== requestId) return true;
+      const url = `http://localhost:3001/api/tts?lang=${encodeURIComponent(language)}&text=${encodeURIComponent(chunk)}`;
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      await audio.play();
+      await new Promise<void>((resolve, reject) => {
+        audio.onended = () => resolve();
+        audio.onerror = () => reject(new Error('Google TTS proxy audio failed'));
+      });
+    }
+    return true;
+  } catch (error) {
+    if (speechRequestRef.current !== requestId) return true;
+    console.warn('Google TTS failed, falling back to browser speech synthesis:', error);
+    return false;
+  }
+}
+
+function splitForGoogleTts(text: string): string[] {
+  const normalized = cleanTranscript(text);
+  if (!normalized) return [];
+  const chunks: string[] = [];
+  let current = '';
+  for (const word of normalized.split(' ')) {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > 180) {
+      if (current) chunks.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
+}
+
+function chooseBestVoice(voices: SpeechSynthesisVoice[], languageCode: AppLanguageCode): SpeechSynthesisVoice | undefined {
+  const preferredNames = languageCode === 'hi-IN'
+    ? ['Google हिन्दी', 'Microsoft Heera', 'Microsoft Ravi', 'Microsoft Zira', 'Microsoft David']
+    : ['Google हिन्दी', 'Google UK English Female', 'Microsoft Zira', 'Microsoft David', 'Microsoft Heera', 'Microsoft Ravi'];
+  for (const name of preferredNames) {
+    const match = voices.find(v => v.name.toLowerCase().includes(name.toLowerCase()));
+    if (match) return match;
+  }
+  return (
+    voices.find(v => v.lang.toLowerCase() === languageCode.toLowerCase()) ||
+    voices.find(v => v.lang.toLowerCase().startsWith(languageCode.split('-')[0].toLowerCase())) ||
+    voices.find(v => v.lang.toLowerCase() === 'en-in') ||
+    voices.find(v => v.lang.toLowerCase().startsWith('en-in')) ||
+    voices.find(v => v.lang.toLowerCase().startsWith('en-gb')) ||
+    voices.find(v => v.lang.toLowerCase().startsWith('en-us')) ||
+    voices[0]
+  );
+}
 
 // Styles
 const patientProfileStyle: React.CSSProperties = {

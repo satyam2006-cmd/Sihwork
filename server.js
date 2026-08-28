@@ -2,22 +2,268 @@ import express from 'express';
 import cors from 'cors';
 import puppeteerExtra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import fs from 'fs/promises';
+import path from 'path';
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 
 // Enable stealth mode to bypass ChatGPT's bot detection
 puppeteerExtra.use(StealthPlugin());
 
 const app = express();
 const port = 3001;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const dataDir = path.join(__dirname, 'data');
+const sqlitePath = path.join(dataDir, 'medpulse.sqlite');
+const jsonFallbackPath = path.join(dataDir, 'patients.json');
+const usersJsonFallbackPath = path.join(dataDir, 'users.json');
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));
 
 let browser = null;
 let page = null;
 let isInitializing = false;
+let sessionInitialized = false;
 
 const REALISTIC_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
+
+async function runPython(script, args = []) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('python', ['-c', script, ...args], { cwd: __dirname });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', chunk => { stdout += chunk.toString(); });
+    child.stderr.on('data', chunk => { stderr += chunk.toString(); });
+    child.on('error', reject);
+    child.on('close', code => {
+      if (code === 0) {
+        resolve(stdout.trim());
+      } else {
+        reject(new Error(stderr || `Python exited with code ${code}`));
+      }
+    });
+  });
+}
+
+async function listPatientsFromJsonFallback() {
+  try {
+    const raw = await fs.readFile(jsonFallbackPath, 'utf8');
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+async function savePatientsToJsonFallback(patients) {
+  await fs.mkdir(dataDir, { recursive: true });
+  await fs.writeFile(jsonFallbackPath, JSON.stringify(patients, null, 2));
+}
+
+async function listPatients() {
+  await fs.mkdir(dataDir, { recursive: true });
+  const script = `
+import json, sqlite3, sys
+db = sys.argv[1]
+conn = sqlite3.connect(db)
+conn.execute("CREATE TABLE IF NOT EXISTS patients (id TEXT PRIMARY KEY, name TEXT, triage_level TEXT, routed_at TEXT, record_json TEXT NOT NULL)")
+rows = conn.execute("SELECT record_json FROM patients ORDER BY routed_at DESC, id DESC").fetchall()
+print(json.dumps([json.loads(row[0]) for row in rows]))
+conn.close()
+`;
+  try {
+    return JSON.parse(await runPython(script, [sqlitePath]));
+  } catch (error) {
+    console.warn('[Server] SQLite unavailable; using JSON fallback:', error.message);
+    return listPatientsFromJsonFallback();
+  }
+}
+
+async function savePatient(patient) {
+  await fs.mkdir(dataDir, { recursive: true });
+  const script = `
+import json, sqlite3, sys
+db, payload = sys.argv[1], sys.argv[2]
+patient = json.loads(payload)
+conn = sqlite3.connect(db)
+conn.execute("CREATE TABLE IF NOT EXISTS patients (id TEXT PRIMARY KEY, name TEXT, triage_level TEXT, routed_at TEXT, record_json TEXT NOT NULL)")
+conn.execute("INSERT OR REPLACE INTO patients (id, name, triage_level, routed_at, record_json) VALUES (?, ?, ?, ?, ?)", (patient.get("id"), patient.get("name", ""), patient.get("triageLevel", ""), patient.get("routedAt", ""), json.dumps(patient)))
+conn.commit()
+conn.close()
+`;
+  try {
+    await runPython(script, [sqlitePath, JSON.stringify(patient)]);
+    return patient;
+  } catch (error) {
+    console.warn('[Server] SQLite unavailable; saving to JSON fallback:', error.message);
+    const patients = await listPatientsFromJsonFallback();
+    const withoutExisting = patients.filter(p => p.id !== patient.id);
+    await savePatientsToJsonFallback([patient, ...withoutExisting]);
+    return patient;
+  }
+}
+
+async function deletePatient(id) {
+  await fs.mkdir(dataDir, { recursive: true });
+  const script = `
+import sqlite3, sys
+db, patient_id = sys.argv[1], sys.argv[2]
+conn = sqlite3.connect(db)
+conn.execute("CREATE TABLE IF NOT EXISTS patients (id TEXT PRIMARY KEY, name TEXT, triage_level TEXT, routed_at TEXT, record_json TEXT NOT NULL)")
+conn.execute("DELETE FROM patients WHERE id = ?", (patient_id,))
+conn.commit()
+conn.close()
+`;
+  try {
+    await runPython(script, [sqlitePath, id]);
+  } catch (error) {
+    console.warn('[Server] SQLite unavailable; deleting from JSON fallback:', error.message);
+    const patients = await listPatientsFromJsonFallback();
+    await savePatientsToJsonFallback(patients.filter(p => p.id !== id));
+  }
+}
+
+function hashPassword(password) {
+  return crypto.createHash('sha256').update(String(password || '')).digest('hex');
+}
+
+function defaultDoctorUser() {
+  return {
+    id: 'doctor-default',
+    role: 'doctor',
+    name: 'Doctor',
+    email: 'doctor@medpulse.local',
+    passwordHash: hashPassword('doctor123'),
+    abhaId: '',
+    age: 0,
+    gender: '',
+  };
+}
+
+function defaultPatientUser() {
+  return {
+    id: 'patient-sample',
+    role: 'patient',
+    name: 'Mohak Leader',
+    email: 'mohak@medpulse.local',
+    passwordHash: hashPassword('patient123'),
+    abhaId: '91-8843-1250-9982',
+    age: 24,
+    gender: 'Male',
+  };
+}
+
+async function listUsersFromJsonFallback() {
+  try {
+    const raw = await fs.readFile(usersJsonFallbackPath, 'utf8');
+    const users = JSON.parse(raw);
+    const withDoctor = users.some(user => user.id === 'doctor-default') ? users : [defaultDoctorUser(), ...users];
+    return withDoctor.some(user => user.id === 'patient-sample') ? withDoctor : [defaultPatientUser(), ...withDoctor];
+  } catch {
+    return [defaultPatientUser(), defaultDoctorUser()];
+  }
+}
+
+async function saveUsersToJsonFallback(users) {
+  await fs.mkdir(dataDir, { recursive: true });
+  await fs.writeFile(usersJsonFallbackPath, JSON.stringify(users, null, 2));
+}
+
+async function runUserQuery(action, payload = {}) {
+  await fs.mkdir(dataDir, { recursive: true });
+  const script = `
+import json, sqlite3, sys
+db, action, payload_raw = sys.argv[1], sys.argv[2], sys.argv[3]
+payload = json.loads(payload_raw)
+doctor = payload.get("doctor")
+patient = payload.get("patient")
+conn = sqlite3.connect(db)
+conn.row_factory = sqlite3.Row
+conn.execute("CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, role TEXT NOT NULL, name TEXT NOT NULL, email TEXT UNIQUE, password_hash TEXT, abha_id TEXT UNIQUE, age INTEGER, gender TEXT)")
+conn.execute("INSERT OR IGNORE INTO users (id, role, name, email, password_hash, abha_id, age, gender) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (doctor["id"], doctor["role"], doctor["name"], doctor["email"], doctor["passwordHash"], doctor["abhaId"], doctor["age"], doctor["gender"]))
+conn.execute("INSERT OR IGNORE INTO users (id, role, name, email, password_hash, abha_id, age, gender) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (patient["id"], patient["role"], patient["name"], patient["email"], patient["passwordHash"], patient["abhaId"], patient["age"], patient["gender"]))
+result = None
+if action == "create":
+    user = payload["user"]
+    conn.execute("INSERT INTO users (id, role, name, email, password_hash, abha_id, age, gender) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (user["id"], user["role"], user["name"], user.get("email", ""), user.get("passwordHash", ""), user.get("abhaId", ""), user.get("age", 0), user.get("gender", "")))
+    result = user
+elif action == "login_email":
+    row = conn.execute("SELECT * FROM users WHERE role = ? AND lower(email) = lower(?) AND password_hash = ?", (payload["role"], payload["email"], payload["passwordHash"])).fetchone()
+    result = dict(row) if row else None
+elif action == "login_abha":
+    row = conn.execute("SELECT * FROM users WHERE role = 'patient' AND abha_id = ?", (payload["abhaId"],)).fetchone()
+    result = dict(row) if row else None
+conn.commit()
+conn.close()
+print(json.dumps(result))
+`;
+  return JSON.parse(await runPython(script, [sqlitePath, action, JSON.stringify({ ...payload, doctor: defaultDoctorUser(), patient: defaultPatientUser() })]));
+}
+
+function publicUser(user) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    role: user.role,
+    name: user.name,
+    email: user.email || '',
+    abhaId: user.abha_id || user.abhaId || '',
+    age: Number(user.age || 0),
+    gender: user.gender || '',
+  };
+}
+
+async function createUser(userInput) {
+  const user = {
+    id: `user-${Date.now()}`,
+    role: userInput.role,
+    name: String(userInput.name || '').trim(),
+    email: String(userInput.email || '').trim(),
+    passwordHash: hashPassword(userInput.password),
+    abhaId: String(userInput.abhaId || '').trim(),
+    age: Number(userInput.age || 0),
+    gender: String(userInput.gender || '').trim(),
+  };
+
+  try {
+    return publicUser(await runUserQuery('create', { user }));
+  } catch (error) {
+    console.warn('[Server] SQLite user create unavailable; using JSON fallback:', error.message);
+    const users = await listUsersFromJsonFallback();
+    if (users.some(existing => user.email && existing.email?.toLowerCase() === user.email.toLowerCase())) {
+      throw new Error('Email already exists.');
+    }
+    if (users.some(existing => user.abhaId && existing.abhaId === user.abhaId)) {
+      throw new Error('ABHA ID already exists.');
+    }
+    await saveUsersToJsonFallback([user, ...users]);
+    return publicUser(user);
+  }
+}
+
+async function loginUser(loginInput) {
+  const role = String(loginInput.role || '').trim();
+  const email = String(loginInput.email || '').trim();
+  const abhaId = String(loginInput.abhaId || '').trim();
+  const passwordHash = hashPassword(loginInput.password);
+
+  try {
+    const user = abhaId
+      ? await runUserQuery('login_abha', { abhaId })
+      : await runUserQuery('login_email', { role, email, passwordHash });
+    return publicUser(user);
+  } catch (error) {
+    console.warn('[Server] SQLite user login unavailable; using JSON fallback:', error.message);
+    const users = await listUsersFromJsonFallback();
+    const user = abhaId
+      ? users.find(existing => existing.role === 'patient' && existing.abhaId === abhaId)
+      : users.find(existing => existing.role === role && existing.email?.toLowerCase() === email.toLowerCase() && existing.passwordHash === passwordHash);
+    return publicUser(user);
+  }
+}
 
 // Helper to dismiss common onboarding/login popups in ChatGPT guest mode
 async function dismissPopups(targetPage) {
@@ -97,7 +343,7 @@ async function initBrowser() {
   
   try {
     browser = await puppeteerExtra.launch({
-      headless: false, // Set to false so the user can visually see it running in the background for the Hackathon!
+      headless: false,
       defaultViewport: null,
       args: [
         '--start-maximized',
@@ -172,11 +418,244 @@ app.post('/api/reset', async (req, res) => {
     }
     await new Promise(r => setTimeout(r, 1500));
     await dismissPopups(page);
+    sessionInitialized = false;
     res.json({ success: true, message: 'Chat session reset successfully.' });
   } catch (error) {
     console.error('[Server] Reset error:', error.message);
     res.status(500).json({ error: 'Failed to reset page.' });
   }
+});
+
+async function sendPromptAndReadJson(prompt, maxWaitSeconds = 60) {
+  await initBrowser();
+  await dismissPopups(page);
+
+  console.log('[Server] Waiting for input composer...');
+  await page.waitForSelector(TEXTAREA_SELECTOR, { timeout: 20000 });
+  await page.focus(TEXTAREA_SELECTOR);
+
+  await page.evaluate((text, selector) => {
+    const textarea = document.querySelector(selector);
+    if (textarea) {
+      textarea.value = text;
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }, prompt, TEXTAREA_SELECTOR);
+
+  await new Promise(r => setTimeout(r, 500));
+  console.log('[Server] Locating send button...');
+  await page.waitForSelector(SEND_BUTTON_SELECTOR, { timeout: 8000 });
+  await page.click(SEND_BUTTON_SELECTOR);
+
+  console.log('[Server] Prompt submitted. Waiting for output...');
+  let isGenerating = true;
+  let timeoutCounter = 0;
+
+  while (isGenerating && timeoutCounter < maxWaitSeconds) {
+    await new Promise(r => setTimeout(r, 1000));
+    timeoutCounter++;
+
+    const stopButton = await page.$('button[aria-label="Stop generating"], button[aria-label*="Stop"]');
+    const sendButton = await page.$(SEND_BUTTON_SELECTOR);
+
+    if (!stopButton && sendButton) {
+      const isDisabled = await page.evaluate(el => el.disabled, sendButton);
+      if (!isDisabled) {
+        isGenerating = false;
+      }
+    }
+
+    if (timeoutCounter % 5 === 0) {
+      await dismissPopups(page);
+    }
+  }
+
+  await page.waitForSelector(ASSISTANT_MESSAGE_SELECTOR, { timeout: 10000 });
+  const messages = await page.$$(ASSISTANT_MESSAGE_SELECTOR);
+  if (messages.length === 0) {
+    throw new Error('No assistant responses found in DOM.');
+  }
+
+  const lastMessage = messages[messages.length - 1];
+  const rawText = await page.evaluate(el => {
+    const prose = el.querySelector('[class*="messageCopy"]') || el.querySelector('.prose') || el;
+    return prose.innerText || '';
+  }, lastMessage);
+
+  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+  const jsonString = jsonMatch ? jsonMatch[0] : rawText;
+
+  try {
+    return JSON.parse(jsonString.trim());
+  } catch (parseError) {
+    console.warn('[Server] Failed to parse scraped response as JSON. Sending raw text:', rawText);
+    return { rawResponse: rawText };
+  }
+}
+
+app.post('/api/session/start', async (req, res) => {
+  const { prompt } = req.body;
+  if (!prompt) {
+    return res.status(400).json({ error: 'Prompt is required.' });
+  }
+
+  console.log('[Server] Starting one-time interview session setup...');
+  try {
+    const parsed = await sendPromptAndReadJson(prompt, 60);
+    sessionInitialized = true;
+    res.json(parsed);
+  } catch (error) {
+    console.error('[Server] Session setup error:', error);
+    res.status(500).json({ error: error.message || 'Session setup failed.' });
+  }
+});
+
+app.get('/api/tts', async (req, res) => {
+  const text = String(req.query.text || '').trim();
+  const lang = String(req.query.lang || 'hi').trim();
+
+  if (!text) {
+    return res.status(400).json({ error: 'Text is required.' });
+  }
+
+  const url = new URL('https://translate.google.com/translate_tts');
+  url.searchParams.set('ie', 'UTF-8');
+  url.searchParams.set('client', 'tw-ob');
+  url.searchParams.set('tl', lang);
+  url.searchParams.set('q', text.slice(0, 190));
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': REALISTIC_USER_AGENT,
+        'Accept': 'audio/mpeg,audio/*;q=0.9,*/*;q=0.8',
+        'Referer': 'https://translate.google.com/',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Google TTS status ${response.status}`);
+    }
+
+    const audioBuffer = Buffer.from(await response.arrayBuffer());
+    res.setHeader('Content-Type', response.headers.get('content-type') || 'audio/mpeg');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(audioBuffer);
+  } catch (error) {
+    console.error('[Server] Google TTS proxy failed:', error.message);
+    res.status(502).json({ error: error.message || 'Google TTS failed.' });
+  }
+});
+
+app.post('/api/translate', async (req, res) => {
+  const text = String(req.body.text || '').trim();
+  if (!text) {
+    return res.json({ translatedText: '' });
+  }
+
+  const url = new URL('https://translate.googleapis.com/translate_a/single');
+  url.searchParams.set('client', 'gtx');
+  url.searchParams.set('sl', 'auto');
+  url.searchParams.set('tl', 'en');
+  url.searchParams.set('dt', 't');
+  url.searchParams.set('q', text.slice(0, 4500));
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': REALISTIC_USER_AGENT,
+        'Accept': 'application/json,text/plain,*/*',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Google Translate status ${response.status}`);
+    }
+
+    const data = await response.json();
+    const translatedText = Array.isArray(data?.[0])
+      ? data[0].map(part => part?.[0] || '').join('')
+      : text;
+    res.json({ translatedText });
+  } catch (error) {
+    console.error('[Server] Google Translate proxy failed:', error.message);
+    res.status(502).json({ error: error.message || 'Translation failed.' });
+  }
+});
+
+app.get('/api/patients', async (req, res) => {
+  try {
+    res.json({ patients: await listPatients() });
+  } catch (error) {
+    console.error('[Server] Patient list failed:', error.message);
+    res.status(500).json({ error: error.message || 'Patient list failed.' });
+  }
+});
+
+app.post('/api/patients', async (req, res) => {
+  const patient = req.body.patient;
+  if (!patient?.id) {
+    return res.status(400).json({ error: 'Patient record with id is required.' });
+  }
+
+  try {
+    res.status(201).json({ patient: await savePatient(patient) });
+  } catch (error) {
+    console.error('[Server] Patient save failed:', error.message);
+    res.status(500).json({ error: error.message || 'Patient save failed.' });
+  }
+});
+
+app.delete('/api/patients/:id', async (req, res) => {
+  try {
+    await deletePatient(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[Server] Patient delete failed:', error.message);
+    res.status(500).json({ error: error.message || 'Patient delete failed.' });
+  }
+});
+
+app.post('/api/auth/signup', async (req, res) => {
+  const { name, email, password, abhaId, age, gender } = req.body;
+  if (!name || !email || !password || !abhaId) {
+    return res.status(400).json({ error: 'Name, email, password, and ABHA ID are required.' });
+  }
+
+  try {
+    const user = await createUser({
+      role: 'patient',
+      name,
+      email,
+      password,
+      abhaId,
+      age,
+      gender,
+    });
+    res.status(201).json({ user });
+  } catch (error) {
+    console.error('[Server] Signup failed:', error.message);
+    res.status(400).json({ error: error.message || 'Signup failed.' });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  const { role, email, password, abhaId } = req.body;
+  if (role === 'patient' && abhaId) {
+    const user = await loginUser({ role, abhaId });
+    if (user) return res.json({ user });
+    return res.status(401).json({ error: 'No patient found for this ABHA ID.' });
+  }
+
+  if (!role || !email || !password) {
+    return res.status(400).json({ error: 'Role, email, and password are required.' });
+  }
+
+  const user = await loginUser({ role, email, password });
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid login details.' });
+  }
+  res.json({ user });
 });
 
 // Chat automation endpoint
@@ -188,94 +667,12 @@ app.post('/api/chat', async (req, res) => {
 
   console.log('[Server] Processing conversation turn...');
   try {
-    await initBrowser();
-    await dismissPopups(page);
-
-    // Wait for the text input area
-    console.log('[Server] Waiting for input composer...');
-    await page.waitForSelector(TEXTAREA_SELECTOR, { timeout: 20000 });
-    
-    // Focus and type the prompt
-    await page.focus(TEXTAREA_SELECTOR);
-    
-    // Use page.evaluate to set text directly (faster and safer for long prompts)
-    await page.evaluate((text, selector) => {
-      const textarea = document.querySelector(selector);
-      if (textarea) {
-        textarea.value = text;
-        // Trigger input event so React/Vue on ChatGPT knows it changed
-        textarea.dispatchEvent(new Event('input', { bubbles: true }));
-      }
-    }, prompt, TEXTAREA_SELECTOR);
-
-    await new Promise(r => setTimeout(r, 500));
-
-    // Click the send button
-    console.log('[Server] Locating send button...');
-    await page.waitForSelector(SEND_BUTTON_SELECTOR, { timeout: 8000 });
-    await page.click(SEND_BUTTON_SELECTOR);
-
-    console.log('[Server] Prompt submitted. Waiting for ChatGPT streaming output...');
-
-    // Polling mechanism to wait for ChatGPT to finish generating
-    let isGenerating = true;
-    let timeoutCounter = 0;
-    const maxWaitSeconds = 60; // 1 minute max timeout
-
-    while (isGenerating && timeoutCounter < maxWaitSeconds) {
-      await new Promise(r => setTimeout(r, 1000));
-      timeoutCounter++;
-
-      // Check if Stop/Pause button is active (generating is in progress)
-      const stopButton = await page.$('button[aria-label="Stop generating"], button[aria-label*="Stop"]');
-      const sendButton = await page.$(SEND_BUTTON_SELECTOR);
-
-      if (!stopButton && sendButton) {
-        // Double check if send button is no longer disabled
-        const isDisabled = await page.evaluate(el => el.disabled, sendButton);
-        if (!isDisabled) {
-          isGenerating = false;
-        }
-      }
-      
-      // Periodically dismiss popups if they block the view
-      if (timeoutCounter % 5 === 0) {
-        await dismissPopups(page);
-      }
+    if (!sessionInitialized) {
+      console.warn('[Server] Chat turn received before session setup; continuing with compact prompt only.');
     }
-
-    console.log('[Server] Generation finished. Fetching response...');
-
-    // Extract the last assistant response prose
-    await page.waitForSelector(ASSISTANT_MESSAGE_SELECTOR, { timeout: 10000 });
-    
-    const messages = await page.$$(ASSISTANT_MESSAGE_SELECTOR);
-    if (messages.length === 0) {
-      throw new Error('No assistant responses found in DOM.');
-    }
-
-    const lastMessage = messages[messages.length - 1];
-    
-    // Extract the inner text of the prose response
-    const rawText = await page.evaluate(el => {
-      // Find the message block prose/copy element
-      const prose = el.querySelector('[class*="messageCopy"]') || el.querySelector('.prose') || el;
-      return prose.innerText || '';
-    }, lastMessage);
-
+    const parsedJson = await sendPromptAndReadJson(prompt, 60);
     console.log('[Server] Successfully scraped response from browser.');
-    
-    // Parse JSON block out of response
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    const jsonString = jsonMatch ? jsonMatch[0] : rawText;
-
-    try {
-      const parsedJson = JSON.parse(jsonString.trim());
-      res.json(parsedJson);
-    } catch (parseError) {
-      console.warn('[Server] Failed to parse scraped response as JSON. Sending raw text:', rawText);
-      res.json({ rawResponse: rawText });
-    }
+    res.json(parsedJson);
 
   } catch (error) {
     console.error('[Server] Automation error:', error);

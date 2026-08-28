@@ -248,3 +248,231 @@ h1, h2, h3, h4, h5, h6 {
 .neo-alert.alert-success {
   background-color: var(--color-green);
 }
+
+/* ============================================
+   Google Keep-Style OCR Components
+   ============================================ */
+
+/* Keep Note Card */
+.keep-note {
+  background-color: #FFF9C4;
+  border: 2px solid var(--color-black);
+  border-radius: 8px;
+  padding: 0;
+  position: relative;
+  box-shadow: 3px 3px 0px var(--color-black);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  overflow: hidden;
+}
+
+.keep-note:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 5px 5px 0px var(--color-black);
+}
+
+.keep-note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 2px solid var(--color-black);
+  background-color: rgba(0, 0, 0, 0.03);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.keep-note-body {
+  padding: 0.75rem;
+}
+
+.keep-note-text {
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: #333;
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 60px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.keep-note-image {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-bottom: 2px solid var(--color-black);
+  display: block;
+}
+
+.keep-note-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.75rem;
+  border-top: 1.5px solid rgba(0, 0, 0, 0.1);
+  font-size: 0.65rem;
+  color: #888;
+}
+
+.keep-note-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.keep-note-actions button {
+  background: none;
+  border: 1.5px solid transparent;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #555;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.keep-note-actions button:hover {
+  background: rgba(0, 0, 0, 0.08);
+  border-color: var(--color-black);
+}
+
+/* Color Variants for Keep Notes */
+.keep-note.keep-coral { background-color: #FAAFA8; }
+.keep-note.keep-peach { background-color: #F39F76; }
+.keep-note.keep-sand { background-color: #FFF8B8; }
+.keep-note.keep-mint { background-color: #E2F6D3; }
+.keep-note.keep-sage { background-color: #B4DDD3; }
+.keep-note.keep-fog { background-color: #D3E5EF; }
+.keep-note.keep-lavender { background-color: #D3BFDB; }
+.keep-note.keep-blossom { background-color: #F6E2DD; }
+
+/* Drag & Drop Zone */
+.drop-zone {
+  border: 3px dashed var(--color-black);
+  border-radius: 12px;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #FFF;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, transform 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+
+.drop-zone:hover {
+  background-color: #FFFDE7;
+  border-color: #FBC02D;
+}
+
+.drop-zone.drop-active {
+  background-color: #FFF9C4;
+  border-color: #F9A825;
+  transform: scale(1.02);
+  animation: dropPulse 1s ease-in-out infinite;
+}
+
+@keyframes dropPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(249, 168, 37, 0.3); }
+  50% { box-shadow: 0 0 0 12px rgba(249, 168, 37, 0); }
+}
+
+/* Handwriting/Printed Toggle Switch */
+.ocr-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background-color: #FFF;
+  border: 2px solid var(--color-black);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: var(--font-display);
+  box-shadow: 2px 2px 0px var(--color-black);
+}
+
+.toggle-track {
+  width: 44px;
+  height: 24px;
+  background-color: #E0E0E0;
+  border-radius: 12px;
+  border: 2px solid var(--color-black);
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.25s ease;
+}
+
+.toggle-track.active {
+  background-color: #FFF9C4;
+}
+
+.toggle-thumb {
+  width: 18px;
+  height: 18px;
+  background-color: var(--color-white);
+  border: 2px solid var(--color-black);
+  border-radius: 50%;
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  transition: transform 0.25s ease;
+}
+
+.toggle-track.active .toggle-thumb {
+  transform: translateX(20px);
+  background-color: #FBC02D;
+}
+
+/* OCR scanning shimmer */
+@keyframes ocrShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.ocr-shimmer {
+  background: linear-gradient(
+    90deg,
+    #FFF9C4 25%,
+    #FFF176 37%,
+    #FFF9C4 63%
+  );
+  background-size: 200% 100%;
+  animation: ocrShimmer 1.5s ease-in-out infinite;
+}
+
+/* Keep notes grid layout */
+.keep-notes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+/* Copy success tooltip */
+@keyframes copyFlash {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
+
+.copy-toast {
+  position: absolute;
+  top: -24px;
+  right: 0;
+  background: var(--color-green);
+  color: var(--color-black);
+  font-size: 0.6rem;
+  font-weight: 800;
+  padding: 0.15rem 0.4rem;
+  border: 1.5px solid var(--color-black);
+  border-radius: 3px;
+  animation: copyFlash 1s forwards;
+  pointer-events: none;
+}
+
