@@ -22,6 +22,7 @@ const usersJsonFallbackPath = path.join(dataDir, 'users.json');
 
 app.use(cors());
 app.use(express.json({ limit: '25mb' }));
+app.use('/uploads', express.static(path.join(dataDir, 'uploads')));
 
 let browser = null;
 let page = null;
@@ -31,7 +32,7 @@ let sessionInitialized = false;
 const REALISTIC_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
 
-async function runPython(script, args = []) {
+async function runPython(script, args = [], stdinData = null) {
   return new Promise((resolve, reject) => {
     const child = spawn('python', ['-c', script, ...args], { cwd: __dirname });
     let stdout = '';
@@ -46,6 +47,13 @@ async function runPython(script, args = []) {
         reject(new Error(stderr || `Python exited with code ${code}`));
       }
     });
+    if (stdinData !== null && child.stdin) {
+      child.stdin.on('error', err => {
+        console.error('[Server] Python stdin error:', err.message);
+      });
+      child.stdin.write(stdinData);
+      child.stdin.end();
+    }
   });
 }
 
@@ -75,7 +83,24 @@ print(json.dumps([json.loads(row[0]) for row in rows]))
 conn.close()
 `;
   try {
-    return JSON.parse(await runPython(script, [sqlitePath]));
+    const sqlitePatients = JSON.parse(await runPython(script, [sqlitePath]));
+    // If SQLite has 0 records but patients.json fallback has data, sync them
+    if (sqlitePatients.length === 0) {
+      const jsonPatients = await listPatientsFromJsonFallback();
+      if (jsonPatients.length > 0) {
+        console.log(`[Server] SQLite patients table empty; syncing ${jsonPatients.length} patients from patients.json fallback`);
+        for (const patient of jsonPatients) {
+          try {
+            await savePatient(patient);
+          } catch (err) {
+            console.error('[Server] Failed to sync patient to SQLite:', patient.id, err.message);
+          }
+        }
+        // Return the synced list
+        return listPatients();
+      }
+    }
+    return sqlitePatients;
   } catch (error) {
     console.warn('[Server] SQLite unavailable; using JSON fallback:', error.message);
     return listPatientsFromJsonFallback();
@@ -86,7 +111,8 @@ async function savePatient(patient) {
   await fs.mkdir(dataDir, { recursive: true });
   const script = `
 import json, sqlite3, sys
-db, payload = sys.argv[1], sys.argv[2]
+db = sys.argv[1]
+payload = sys.stdin.read()
 patient = json.loads(payload)
 conn = sqlite3.connect(db)
 conn.execute("CREATE TABLE IF NOT EXISTS patients (id TEXT PRIMARY KEY, name TEXT, triage_level TEXT, routed_at TEXT, record_json TEXT NOT NULL)")
@@ -95,7 +121,7 @@ conn.commit()
 conn.close()
 `;
   try {
-    await runPython(script, [sqlitePath, JSON.stringify(patient)]);
+    await runPython(script, [sqlitePath], JSON.stringify(patient));
     return patient;
   } catch (error) {
     console.warn('[Server] SQLite unavailable; saving to JSON fallback:', error.message);
@@ -406,6 +432,36 @@ initBrowser();
 const TEXTAREA_SELECTOR = '#prompt-textarea, #mobile-composer-prompt, textarea[placeholder*="ChatGPT"], textarea[aria-label*="ChatGPT"], textarea[placeholder*="Ask"]';
 const SEND_BUTTON_SELECTOR = 'button[data-testid="send-button"], button[aria-label="Send message"], button[aria-label*="Send"], button[aria-label*="Submit"]';
 const ASSISTANT_MESSAGE_SELECTOR = 'div[class*="assistantMessage"]:not([class*="Actions"]), div[data-message-author-role="assistant"], div.agent-turn, div.markdown, div.prose, [data-testid*="assistant"]:not([class*="Actions"])';
+
+// Upload a file (PDF/Image) as base64 and save it to data/uploads
+app.post('/api/upload', async (req, res) => {
+  const { filename, base64 } = req.body;
+  if (!filename || !base64) {
+    return res.status(400).json({ error: 'Filename and base64 content are required.' });
+  }
+
+  try {
+    const uploadsDir = path.join(dataDir, 'uploads');
+    await fs.mkdir(uploadsDir, { recursive: true });
+
+    // Remove the data URL header if present
+    const cleanBase64 = base64.replace(/^data:[^;]+;base64,/, '');
+    const buffer = Buffer.from(cleanBase64, 'base64');
+
+    const ext = path.extname(filename) || '.bin';
+    const uniqueFilename = `${crypto.randomBytes(8).toString('hex')}-${Date.now()}${ext}`;
+    const filePath = path.join(uploadsDir, uniqueFilename);
+
+    await fs.writeFile(filePath, buffer);
+
+    const fileUrl = `http://localhost:3001/uploads/${uniqueFilename}`;
+    console.log(`[Server] File uploaded successfully: ${uniqueFilename}`);
+    res.status(201).json({ url: fileUrl });
+  } catch (error) {
+    console.error('[Server] File upload failed:', error.message);
+    res.status(500).json({ error: 'File upload failed.' });
+  }
+});
 
 // Reset chat session (reloads ChatGPT to clear history for new patient)
 app.post('/api/reset', async (req, res) => {

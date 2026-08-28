@@ -24,6 +24,15 @@ const guessDocumentType = (fileName: string): DocumentType => {
   return 'prescription';
 };
 
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+  });
+};
+
 // Extended ScannedDoc with image preview for Keep notes
 interface KeepNote {
   doc: ScannedDoc;
@@ -101,6 +110,26 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
         imagePreview = await createImagePreview(file);
       }
       const filePreview = URL.createObjectURL(file);
+
+      // Upload the document to the server for persistent access
+      let serverFileUrl = '';
+      try {
+        const base64Content = await fileToBase64(file);
+        const response = await fetch('http://localhost:3001/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: file.name, base64: base64Content }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          serverFileUrl = data.url;
+        } else {
+          console.warn('Backend file upload failed, status:', response.status);
+        }
+      } catch (uploadErr) {
+        console.warn('Backend file upload offline; using local previews.', uploadErr);
+      }
+
       const documentType = guessDocumentType(file.name);
 
       let extractedText = '';
@@ -136,6 +165,10 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
         setOcrProgress(100);
       }
 
+      // Use server URL for previews if available, otherwise local fallbacks
+      const resolvedImagePreview = file.type.startsWith('image/') ? (serverFileUrl || imagePreview) : undefined;
+      const resolvedFilePreview = serverFileUrl || filePreview;
+
       const newDocId = `doc-${Date.now()}`;
       const newDoc: ScannedDoc = {
         id: newDocId,
@@ -143,8 +176,8 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
         type: documentType,
         uploadedAt: new Date().toLocaleDateString(),
         rawText: extractedText || '(No text detected — try a clearer image)',
-        imagePreview,
-        filePreview,
+        imagePreview: resolvedImagePreview,
+        filePreview: resolvedFilePreview,
         mimeType: file.type,
         sourceKind,
         ocrConfidence,
@@ -168,7 +201,7 @@ export const ScanSection: React.FC<ScanSectionProps> = ({
       const colorIndex = (keepNotes.length + 1) % KEEP_COLORS.length;
       const newKeepNote: KeepNote = {
         doc: newDoc,
-        imagePreview,
+        imagePreview: resolvedImagePreview,
         isPinned: false,
         colorClass: KEEP_COLORS[colorIndex],
       };

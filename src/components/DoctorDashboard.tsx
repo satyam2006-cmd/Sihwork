@@ -2,6 +2,105 @@ import React, { useState } from 'react';
 import { Activity, ShieldCheck, FileText, Calendar, CheckSquare, Clock, AlertTriangle, Sparkles, Eye, X } from 'lucide-react';
 import { PatientRecord, TriagePriority } from '../types/medical';
 
+interface MarkdownRendererProps {
+  text: string;
+}
+
+const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ text }) => {
+  if (!text) return null;
+
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+  let currentListItems: React.ReactNode[] = [];
+  let listKey = 0;
+
+  const flushList = () => {
+    if (currentListItems.length > 0) {
+      elements.push(
+        <ul key={`list-${listKey++}`} style={{ paddingLeft: '1.25rem', margin: '0.4rem 0', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          {currentListItems}
+        </ul>
+      );
+      currentListItems = [];
+    }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Handle empty lines
+    if (!trimmed) {
+      flushList();
+      elements.push(<div key={`space-${i}`} style={{ height: '0.4rem' }} />);
+      continue;
+    }
+
+    // Headers
+    if (trimmed.startsWith('# ')) {
+      flushList();
+      elements.push(
+        <h1 key={`h1-${i}`} style={{ fontSize: '1.2rem', fontWeight: 800, margin: '0.6rem 0 0.3rem 0', fontFamily: 'var(--font-display)', borderBottom: '2px solid #1E1E1E', paddingBottom: '0.2rem' }}>
+          {renderInline(trimmed.slice(2))}
+        </h1>
+      );
+      continue;
+    }
+    if (trimmed.startsWith('## ')) {
+      flushList();
+      elements.push(
+        <h2 key={`h2-${i}`} style={{ fontSize: '1.05rem', fontWeight: 800, margin: '0.5rem 0 0.25rem 0', color: '#1E1E1E' }}>
+          {renderInline(trimmed.slice(3))}
+        </h2>
+      );
+      continue;
+    }
+    if (trimmed.startsWith('### ')) {
+      flushList();
+      elements.push(
+        <h3 key={`h3-${i}`} style={{ fontSize: '0.95rem', fontWeight: 800, margin: '0.4rem 0 0.2rem 0' }}>
+          {renderInline(trimmed.slice(4))}
+        </h3>
+      );
+      continue;
+    }
+
+    // List items (starts with - or *)
+    const listMatch = line.match(/^(\s*)([-*])\s+(.*)/);
+    if (listMatch) {
+      const content = listMatch[3];
+      currentListItems.push(
+        <li key={`li-${i}`} style={{ fontSize: '0.8rem', lineHeight: '1.4', margin: 0 }}>
+          {renderInline(content)}
+        </li>
+      );
+      continue;
+    }
+
+    // Regular paragraph lines
+    flushList();
+    elements.push(
+      <p key={`p-${i}`} style={{ fontSize: '0.8rem', lineHeight: '1.4', margin: '0.2rem 0' }}>
+        {renderInline(line)}
+      </p>
+    );
+  }
+
+  flushList();
+
+  return <div style={{ fontFamily: 'var(--font-body)' }}>{elements}</div>;
+};
+
+function renderInline(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, idx) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={idx}>{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+}
+
 interface DoctorDashboardProps {
   patients: PatientRecord[];
   onConsultPatient: (id: string) => void;
@@ -169,9 +268,13 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
                       <FileText size={16} /> Digitized Clinical Summary
                     </h3>
                     <div style={summaryScrollBox}>
-                      <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem', lineHeight: '1.4' }}>
-                        {activePatient.summaryText || 'Generating summary...'}
-                      </div>
+                      {activePatient.summaryText ? (
+                        <MarkdownRenderer text={activePatient.summaryText} />
+                      ) : (
+                        <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.8rem', lineHeight: '1.4' }}>
+                          Generating summary...
+                        </div>
+                      )}
                     </div>
                   </div>
 
